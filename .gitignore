@@ -1,0 +1,9 @@
+node_modules/
+dist-main/
+renderer/.next/
+renderer/out/
+*.js.map
+*.d.ts
+.DS_Store
+.env
+.env.local
