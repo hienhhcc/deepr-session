@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@/*": ["renderer/*"]
+    }
+  },
+  "include": ["shared/**/*.ts", "renderer/**/*.ts", "renderer/**/*.tsx", "main/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist-main", "renderer/.next", "renderer/out"]
+}
