@@ -8,11 +8,17 @@ import {
   Target,
   Trash2,
   ChevronDown,
+  TreePine,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDuration, cn } from "@/lib/utils";
+
+interface SessionTask {
+  id: string;
+  name: string;
+}
 
 interface Session {
   id: string;
@@ -30,6 +36,7 @@ interface Session {
   status: "active" | "paused" | "completed" | "cancelled";
   startedAt: string;
   completedAt?: string;
+  tasks?: SessionTask[];
 }
 
 interface Profile {
@@ -63,7 +70,7 @@ function StarRating({ rating }: { rating: number }) {
           className={cn(
             "h-3.5 w-3.5",
             star <= rating
-              ? "fill-amber-400 text-amber-400"
+              ? "fill-primary text-primary"
               : "text-muted-foreground/30"
           )}
         />
@@ -113,7 +120,7 @@ function SessionCard({
   return (
     <Card
       className={cn(
-        "transition-all duration-200 cursor-pointer hover:shadow-md",
+        "card-hover-lift transition-all duration-200 cursor-pointer",
         expanded && "ring-1 ring-primary/20"
       )}
       onClick={() => setExpanded(!expanded)}
@@ -124,7 +131,11 @@ function SessionCard({
           <div className="flex-1 min-w-0">
             {/* Task name and profile */}
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-medium text-sm truncate">{session.task}</h3>
+              <h3 className="font-medium text-sm truncate">
+                {session.tasks && session.tasks.length > 0
+                  ? session.tasks.map((t) => t.name).join(" · ")
+                  : session.task}
+              </h3>
               {profile && (
                 <span
                   className="inline-block h-2 w-2 rounded-full shrink-0"
@@ -135,7 +146,7 @@ function SessionCard({
             </div>
 
             {/* Date */}
-            <p className="text-xs text-muted-foreground mb-2">
+            <p className="text-xs text-muted-foreground/80 font-medium tracking-wide mb-2">
               {formatSessionDate(session.startedAt)}
             </p>
 
@@ -172,7 +183,7 @@ function SessionCard({
         {/* Expanded details */}
         {expanded && (
           <div
-            className="mt-4 pt-3 border-t border-border space-y-3"
+            className="animate-fade-in-up mt-4 pt-3 border-t border-border space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
             {session.intention && (
@@ -220,9 +231,9 @@ function SessionCard({
 export function SessionList({ sessions, profiles, onDelete }: SessionListProps) {
   if (sessions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-          <History className="h-8 w-8 text-primary/60" />
+      <div className="animate-fade-in-up flex flex-col items-center justify-center py-24 text-center">
+        <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+          <TreePine className="h-8 w-8 text-primary/60" />
         </div>
         <h2 className="text-lg font-medium mb-1">No sessions found</h2>
         <p className="text-sm text-muted-foreground max-w-sm">

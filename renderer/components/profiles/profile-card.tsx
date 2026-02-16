@@ -28,12 +28,12 @@ export function ProfileCard({ profile }: ProfileCardProps) {
 
   return (
     <>
-      <Card className="group relative transition-shadow hover:shadow-md">
+      <Card className="card-hover-lift group relative transition-shadow">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span
-                className="inline-block h-4 w-4 rounded-full ring-2 ring-offset-2 ring-offset-background"
+                className="inline-block h-4 w-4 rounded-full ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
                 style={{
                   backgroundColor: profile.color,
                   boxShadow: `0 0 0 2px ${profile.color}`,
@@ -53,7 +53,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 ${
+                className={`h-8 w-8 transition-colors duration-200 ${
                   confirmDelete
                     ? "text-destructive hover:text-destructive hover:bg-destructive/10"
                     : ""
@@ -68,7 +68,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
         </CardHeader>
 
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-3.5 w-3.5 text-primary/70" />
               <span>{profile.focusDuration}m focus</span>
@@ -126,7 +126,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
           )}
 
           {confirmDelete && (
-            <p className="text-xs text-destructive animate-in fade-in">
+            <p className="text-xs text-destructive animate-fade-in transition-all duration-200">
               Click delete again to confirm
             </p>
           )}

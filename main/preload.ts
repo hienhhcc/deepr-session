@@ -45,6 +45,29 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.PROFILE_DELETE, id),
   },
 
+  task: {
+    create: (input: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_CREATE, input),
+    get: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.TASK_GET, id),
+    list: (filters?: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_LIST, filters),
+    update: (input: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_UPDATE, input),
+    delete: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.TASK_DELETE, id),
+  },
+
+  subtask: {
+    create: (input: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SUBTASK_CREATE, input),
+    update: (input: unknown) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SUBTASK_UPDATE, input),
+    delete: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SUBTASK_DELETE, id),
+    reorder: (taskId: string, subtaskIds: string[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SUBTASK_REORDER, taskId, subtaskIds),
+  },
+
   blocker: {
     start: (domains: string[], apps: string[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.BLOCKER_START, domains, apps),

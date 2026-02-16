@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "electron";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { getDatabase, closeDatabase } from "./services/database.js";
 import { registerProfileHandlers } from "./ipc/profiles.ipc.js";
@@ -7,12 +8,16 @@ import { registerSessionHandlers } from "./ipc/sessions.ipc.js";
 import { registerTimerHandlers } from "./ipc/timer.ipc.js";
 import { registerBlockerHandlers } from "./ipc/blocker.ipc.js";
 import { registerAnalyticsHandlers } from "./ipc/analytics.ipc.js";
+import { registerTaskHandlers } from "./ipc/tasks.ipc.js";
 import { cleanup as cleanupBlocker } from "./services/blocker.service.js";
 import { timerService } from "./services/timer.service.js";
 import { IPC_CHANNELS } from "../shared/types/ipc.js";
 
+console.log("[deepr] Main process starting...");
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+console.log("[deepr] __dirname:", __dirname);
 
 const isDev = !app.isPackaged;
 
@@ -20,6 +25,10 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
 function createWindow() {
+  const preloadPath = path.join(__dirname, "../main/preload.cjs");
+  console.log("[deepr] Preload path:", preloadPath);
+  console.log("[deepr] Preload exists:", fs.existsSync(preloadPath));
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -29,7 +38,7 @@ function createWindow() {
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: "#f5f0e8",
     webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -137,6 +146,7 @@ function registerAllHandlers() {
   registerTimerHandlers();
   registerBlockerHandlers();
   registerAnalyticsHandlers();
+  registerTaskHandlers();
 
   // App utility handlers
   ipcMain.handle(IPC_CHANNELS.APP_GET_PATH, async (_event, name: string) => {
@@ -153,9 +163,30 @@ declare module "electron" {
 app.isQuitting = false;
 
 app.whenReady().then(() => {
-  registerAllHandlers();
-  createWindow();
-  createTray();
+  try {
+    registerAllHandlers();
+    console.log("[deepr] All IPC handlers registered");
+  } catch (err) {
+    console.error("[deepr] FATAL: Failed to register handlers:", err);
+  }
+
+  try {
+    createWindow();
+    console.log("[deepr] Window created");
+
+    // Listen for preload errors
+    mainWindow?.webContents.on("preload-error" as any, (_event: any, preloadPath: string, error: Error) => {
+      console.error("[deepr] Preload error at", preloadPath, ":", error);
+    });
+  } catch (err) {
+    console.error("[deepr] FATAL: Failed to create window:", err);
+  }
+
+  try {
+    createTray();
+  } catch (err) {
+    console.error("[deepr] Failed to create tray:", err);
+  }
 
   // Update tray menu periodically to reflect timer state
   setInterval(updateTrayMenu, 2000);

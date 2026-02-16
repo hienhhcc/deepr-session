@@ -24,7 +24,10 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function fetchAnalytics() {
       const api = getElectronAPI();
-      if (!api) return;
+      if (!api) {
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
       try {
@@ -58,23 +61,30 @@ export default function AnalyticsPage() {
   }, []);
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <BarChart3 className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-semibold">Analytics</h1>
+      <div className="flex items-center gap-4 mb-8">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+          <BarChart3 className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
+            Track your focus patterns and progress
+          </p>
+        </div>
       </div>
 
       {/* Loading state */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground animate-fade-in">
           <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary/50" />
           <p className="text-sm">Loading analytics...</p>
         </div>
       )}
 
       {!loading && (
-        <div className="space-y-6">
+        <div className="stagger-children space-y-6">
           {/* Summary cards row */}
           <SummaryCards summary={summary} />
 

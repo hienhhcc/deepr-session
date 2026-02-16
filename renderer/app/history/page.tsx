@@ -8,6 +8,7 @@ import {
   SessionFiltersBar,
   type SessionFilters,
 } from "@/components/history/session-filters";
+import { Badge } from "@/components/ui/badge";
 
 interface Session {
   id: string;
@@ -62,7 +63,10 @@ export default function HistoryPage() {
 
   const fetchData = useCallback(async () => {
     const api = getElectronAPI();
-    if (!api) return;
+    if (!api) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -127,17 +131,19 @@ export default function HistoryPage() {
   };
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <History className="h-6 w-6 text-primary" />
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <History className="h-5 w-5 text-primary" />
+          </div>
           <h1 className="text-2xl font-semibold">Session History</h1>
         </div>
         {!loading && (
-          <span className="text-sm text-muted-foreground">
+          <Badge variant="secondary" className="text-xs font-medium px-3 py-1">
             {sortedSessions.length} session{sortedSessions.length !== 1 ? "s" : ""}
-          </span>
+          </Badge>
         )}
       </div>
 

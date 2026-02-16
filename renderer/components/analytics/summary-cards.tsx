@@ -16,13 +16,17 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value }: StatCardProps) {
   return (
-    <Card>
+    <Card className="card-hover-lift">
       <CardContent className="p-6">
-        <div className="flex items-center gap-3">
-          <div className="text-primary">{icon}</div>
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold">{value}</p>
+        <div className="flex items-center gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            {icon}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {label}
+            </p>
+            <p className="text-3xl font-bold tracking-tight">{value}</p>
           </div>
         </div>
       </CardContent>
@@ -37,7 +41,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const avgRating = summary?.averageRating;
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="stagger-children grid grid-cols-2 gap-4 lg:grid-cols-4">
       <StatCard
         icon={<Target className="h-5 w-5" />}
         label="Total Sessions"
@@ -45,7 +49,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       />
       <StatCard
         icon={<Clock className="h-5 w-5" />}
-        label="Total Focus Hours"
+        label="Focus Hours"
         value={totalFocusHours.toFixed(1)}
       />
       <StatCard
@@ -54,7 +58,11 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         value={avgSessionLength.toFixed(0)}
       />
       <StatCard
-        icon={<Star className="h-5 w-5" />}
+        icon={
+          <Star
+            className="h-5 w-5 fill-primary text-primary"
+          />
+        }
         label="Avg Rating"
         value={avgRating != null ? avgRating.toFixed(1) : "N/A"}
       />

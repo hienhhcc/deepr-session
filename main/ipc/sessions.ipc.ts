@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import crypto from "node:crypto";
 import { getDatabase } from "../services/database.js";
 import { IPC_CHANNELS } from "../../shared/types/ipc.js";
+import { fetchSessionTasks } from "./tasks.ipc.js";
 import type {
   Session,
   CreateSessionInput,
@@ -49,15 +50,30 @@ export function registerSessionHandlers() {
         input.sessionsBeforeLongBreak || 4
       );
 
+      // Link tasks to session
+      if (input.taskIds && input.taskIds.length > 0) {
+        const insertLink = db.prepare(
+          "INSERT INTO session_tasks (session_id, task_id, sort_order) VALUES (?, ?, ?)"
+        );
+        for (let i = 0; i < input.taskIds.length; i++) {
+          insertLink.run(id, input.taskIds[i], i);
+        }
+      }
+
       const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
-      return rowToSession(row as Record<string, unknown>);
+      const session = rowToSession(row as Record<string, unknown>);
+      session.tasks = fetchSessionTasks(db, id);
+      return session;
     }
   );
 
   ipcMain.handle(IPC_CHANNELS.SESSION_GET, async (_event, id: string) => {
     const db = getDatabase();
     const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
-    return row ? rowToSession(row as Record<string, unknown>) : null;
+    if (!row) return null;
+    const session = rowToSession(row as Record<string, unknown>);
+    session.tasks = fetchSessionTasks(db, id);
+    return session;
   });
 
   ipcMain.handle(
@@ -69,21 +85,28 @@ export function registerSessionHandlers() {
       const db = getDatabase();
       const conditions: string[] = [];
       const params: unknown[] = [];
+      let needsTaskJoin = false;
 
       if (filters?.status) {
-        conditions.push("status = ?");
+        conditions.push("s.status = ?");
         params.push(filters.status);
       }
       if (filters?.profileId) {
-        conditions.push("profile_id = ?");
+        conditions.push("s.profile_id = ?");
         params.push(filters.profileId);
       }
       if (filters?.search) {
-        conditions.push("(task LIKE ? OR intention LIKE ? OR notes LIKE ?)");
+        conditions.push(
+          "(s.task LIKE ? OR s.intention LIKE ? OR s.notes LIKE ? OR t.name LIKE ?)"
+        );
         const term = `%${filters.search}%`;
-        params.push(term, term, term);
+        params.push(term, term, term, term);
+        needsTaskJoin = true;
       }
 
+      const join = needsTaskJoin
+        ? "LEFT JOIN session_tasks st ON st.session_id = s.id LEFT JOIN tasks t ON t.id = st.task_id"
+        : "";
       const where =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const limit = filters?.limit || 50;
@@ -91,11 +114,15 @@ export function registerSessionHandlers() {
 
       const rows = db
         .prepare(
-          `SELECT * FROM sessions ${where} ORDER BY started_at DESC LIMIT ? OFFSET ?`
+          `SELECT DISTINCT s.* FROM sessions s ${join} ${where} ORDER BY s.started_at DESC LIMIT ? OFFSET ?`
         )
         .all(...params, limit, offset);
 
-      return rows.map((row) => rowToSession(row as Record<string, unknown>));
+      return rows.map((row) => {
+        const session = rowToSession(row as Record<string, unknown>);
+        session.tasks = fetchSessionTasks(db, session.id);
+        return session;
+      });
     }
   );
 
