@@ -68,29 +68,30 @@ export default function FocusPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-6">
-      <div className="text-center space-y-8">
+      <div className="text-center space-y-8 animate-fade-in">
         {/* Timer */}
         <TimerDisplay />
 
         {/* Session info */}
         {activeSession && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <h2 className="text-lg font-semibold text-foreground flex items-center justify-center gap-2">
               <Target className="h-5 w-5 text-primary" />
               {activeSession.task}
             </h2>
             {activeSession.intention && (
-              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
                 {activeSession.intention}
               </p>
             )}
-            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <TreePine className="h-3.5 w-3.5" />
+            <div className="flex items-center justify-center gap-5 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <TreePine className="h-3.5 w-3.5 text-primary/60" />
                 Pomodoro {currentPomodoro}
               </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
+              <span className="w-px h-3 bg-border" />
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-primary/60" />
                 {formatTime(accumulatedFocusTime)} focused
               </span>
             </div>
@@ -107,22 +108,24 @@ export default function FocusPage() {
       <Dialog open={showRating} onOpenChange={setShowRating}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Session Complete</DialogTitle>
+            <DialogTitle className="text-xl">Session Complete</DialogTitle>
             <DialogDescription>
               How was your focus during this session?
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-3">
             {/* Star rating */}
-            <div className="space-y-2">
-              <Label>Focus Rating</Label>
-              <div className="flex items-center justify-center gap-1">
+            <div className="space-y-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Focus Rating
+              </Label>
+              <div className="flex items-center justify-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
-                    className="p-1 transition-transform hover:scale-110"
+                    className="p-1.5 transition-transform hover:scale-125 active:scale-95"
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
                     onClick={() => setRating(star)}
@@ -131,8 +134,8 @@ export default function FocusPage() {
                       className={cn(
                         "h-8 w-8 transition-colors",
                         (hoverRating || rating) >= star
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-muted-foreground"
+                          ? "fill-primary text-primary"
+                          : "text-muted-foreground/25"
                       )}
                     />
                   </button>
@@ -142,7 +145,12 @@ export default function FocusPage() {
 
             {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="session-notes">Notes (optional)</Label>
+              <Label
+                htmlFor="session-notes"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Notes <span className="font-normal normal-case tracking-normal">(optional)</span>
+              </Label>
               <Textarea
                 id="session-notes"
                 placeholder="Any reflections on this session?"
@@ -180,29 +188,29 @@ function TimerControlsWithRating({ onStop }: { onStop: () => void }) {
   if (status === "idle") return null;
 
   return (
-    <div className="flex items-center justify-center gap-3">
+    <div className="flex items-center justify-center gap-3 animate-fade-in-up">
       {status === "running" ? (
         <>
-          <Button variant="outline" size="lg" onClick={pause} className="gap-2">
+          <Button variant="outline" size="lg" onClick={pause} className="gap-2 rounded-xl">
             <Pause className="h-5 w-5" />
             Pause
           </Button>
-          <Button variant="outline" size="lg" onClick={skip} className="gap-2">
+          <Button variant="outline" size="lg" onClick={skip} className="gap-2 rounded-xl">
             <SkipForward className="h-5 w-5" />
             Skip
           </Button>
-          <Button variant="destructive" size="lg" onClick={handleStop} className="gap-2">
+          <Button variant="destructive" size="lg" onClick={handleStop} className="gap-2 rounded-xl">
             <Square className="h-5 w-5" />
             Stop
           </Button>
         </>
       ) : (
         <>
-          <Button variant="default" size="lg" onClick={resume} className="gap-2">
+          <Button variant="default" size="lg" onClick={resume} className="gap-2 rounded-xl">
             <Play className="h-5 w-5" />
             Resume
           </Button>
-          <Button variant="destructive" size="lg" onClick={handleStop} className="gap-2">
+          <Button variant="destructive" size="lg" onClick={handleStop} className="gap-2 rounded-xl">
             <Square className="h-5 w-5" />
             Stop
           </Button>

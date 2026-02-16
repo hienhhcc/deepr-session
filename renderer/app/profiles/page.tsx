@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserCircle, Plus, Leaf, Loader2 } from "lucide-react";
+import { UserCircle, Plus, Sprout, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProfileStore } from "@/stores/profile.store";
 import { ProfileCard } from "@/components/profiles/profile-card";
@@ -16,11 +16,13 @@ export default function ProfilesPage() {
   }, [fetchProfiles]);
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <UserCircle className="h-6 w-6 text-primary" />
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <UserCircle className="h-5 w-5 text-primary" />
+          </div>
           <h1 className="text-2xl font-semibold">Context Profiles</h1>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
@@ -39,9 +41,9 @@ export default function ProfilesPage() {
 
       {/* Empty state */}
       {!loading && profiles.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Leaf className="h-8 w-8 text-primary/60" />
+        <div className="animate-fade-in-up flex flex-col items-center justify-center py-24 text-center">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+            <Sprout className="h-8 w-8 text-primary/60" />
           </div>
           <h2 className="text-lg font-medium mb-1">No profiles yet</h2>
           <p className="text-sm text-muted-foreground max-w-sm mb-6">
@@ -57,7 +59,7 @@ export default function ProfilesPage() {
 
       {/* Profile grid */}
       {profiles.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="stagger-children grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {profiles.map((profile) => (
             <ProfileCard key={profile.id} profile={profile} />
           ))}

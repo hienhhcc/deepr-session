@@ -20,8 +20,13 @@ export function registerAnalyticsHandlers() {
           GROUP BY date(started_at)
           ORDER BY date`
         )
-        .all(startDate, endDate);
-      return rows;
+        .all(startDate, endDate) as Record<string, unknown>[];
+      return rows.map((r) => ({
+        date: r.date as string,
+        totalFocusMinutes: r.total_focus_minutes as number,
+        sessionsCompleted: r.sessions_completed as number,
+        averageRating: r.average_rating as number | null,
+      }));
     }
   );
 
@@ -43,8 +48,14 @@ export function registerAnalyticsHandlers() {
           GROUP BY strftime('%Y-W%W', started_at)
           ORDER BY week`
         )
-        .all(weeksBack * 7);
-      return rows;
+        .all(weeksBack * 7) as Record<string, unknown>[];
+      return rows.map((r) => ({
+        week: r.week as string,
+        weekStart: r.week_start as string,
+        totalFocusHours: r.total_focus_hours as number,
+        sessionsCompleted: r.sessions_completed as number,
+        averageRating: r.average_rating as number | null,
+      }));
     }
   );
 

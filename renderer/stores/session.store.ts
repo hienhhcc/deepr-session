@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { getElectronAPI } from "@/lib/electron-api";
 
+import type { Task } from "./task.store";
+
 export interface Session {
   id: string;
   task: string;
@@ -17,6 +19,7 @@ export interface Session {
   status: "active" | "paused" | "completed" | "cancelled";
   startedAt: string;
   completedAt?: string;
+  tasks?: Task[];
 }
 
 export interface CreateSessionInput {
@@ -27,6 +30,7 @@ export interface CreateSessionInput {
   breakDuration: number;
   longBreakDuration: number;
   sessionsBeforeLongBreak: number;
+  taskIds?: string[];
 }
 
 interface SessionState {
@@ -43,17 +47,25 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   createSession: async (input) => {
     const api = getElectronAPI();
-    if (!api) return null;
+    if (!api) {
+      console.error("Electron API not available — session creation skipped");
+      return null;
+    }
 
     set({ loading: true });
     try {
-      const session = await api.session.create(input);
+      const session = (await api.session.create(input)) as Session;
+      if (!session?.id) {
+        console.error("Session creation returned invalid data:", session);
+        set({ loading: false });
+        return null;
+      }
       set({ activeSession: session, loading: false });
       return session;
     } catch (error) {
       console.error("Failed to create session:", error);
       set({ loading: false });
-      return null;
+      throw error;
     }
   },
 

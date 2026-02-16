@@ -10,6 +10,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 export interface SessionFilters {
@@ -40,7 +41,7 @@ export function SessionFiltersBar({
     onChange({ ...filters, ...patch });
 
   return (
-    <div className="space-y-3">
+    <div className="rounded-xl border bg-card/50 p-4 space-y-4">
       {/* Search and selects row */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Search input */}
@@ -50,7 +51,7 @@ export function SessionFiltersBar({
             placeholder="Search by task name..."
             value={filters.search}
             onChange={(e) => update({ search: e.target.value })}
-            className="pl-9"
+            className="pl-9 h-10"
           />
         </div>
 
@@ -63,7 +64,7 @@ export function SessionFiltersBar({
               update({ status: val as SessionFilters["status"] })
             }
           >
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] h-10">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -80,7 +81,7 @@ export function SessionFiltersBar({
             value={filters.profileId}
             onValueChange={(val) => update({ profileId: val })}
           >
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[160px] h-10">
               <SelectValue placeholder="All profiles" />
             </SelectTrigger>
             <SelectContent>
@@ -101,6 +102,9 @@ export function SessionFiltersBar({
         )}
       </div>
 
+      {/* Divider */}
+      <Separator className="opacity-50" />
+
       {/* Date range buttons */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground mr-1">Period:</span>
@@ -117,7 +121,7 @@ export function SessionFiltersBar({
             size="sm"
             onClick={() => update({ dateRange: option.value })}
             className={cn(
-              "text-xs h-7 px-3",
+              "text-xs h-7 px-3 rounded-full",
               filters.dateRange === option.value &&
                 "bg-primary text-primary-foreground"
             )}

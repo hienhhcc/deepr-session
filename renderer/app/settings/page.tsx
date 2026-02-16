@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Database, Volume2, Info } from "lucide-react";
+import { Settings, Database, Volume2, Info, Leaf } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -47,16 +47,27 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="animate-fade-in-up space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <Settings className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Settings className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold">Settings</h1>
+          <p className="text-sm text-muted-foreground">
+            Configure your Deepr Session experience
+          </p>
+        </div>
       </div>
 
       {/* General */}
-      <Card>
+      <Card className="card-hover-lift">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">General</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            App behavior and system preferences
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -91,12 +102,15 @@ export default function SettingsPage() {
       </Card>
 
       {/* Sound */}
-      <Card>
+      <Card className="card-hover-lift">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Volume2 className="h-4 w-4" />
             Sound
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Audio feedback and alert preferences
+          </p>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -115,12 +129,15 @@ export default function SettingsPage() {
       </Card>
 
       {/* Data */}
-      <Card>
+      <Card className="card-hover-lift">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Database className="h-4 w-4" />
             Data
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Storage and data management
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
@@ -133,20 +150,33 @@ export default function SettingsPage() {
       </Card>
 
       {/* About */}
-      <Card>
+      <Card className="card-hover-lift">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Info className="h-4 w-4" />
             About
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-1">
-          <p className="text-sm font-medium">Deepr Session</p>
-          <p className="text-xs text-muted-foreground">
-            A deep work focus timer with distraction blocking, ambient sounds,
-            and analytics.
-          </p>
-          <p className="text-xs text-muted-foreground">Version 1.0.0</p>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Leaf className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Deepr Session</p>
+              <p className="text-xs text-muted-foreground">
+                A deep work focus timer with distraction blocking, ambient sounds,
+                and analytics.
+              </p>
+            </div>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Version</span>
+            <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+              1.0.0
+            </span>
+          </div>
         </CardContent>
       </Card>
     </div>

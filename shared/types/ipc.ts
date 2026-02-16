@@ -37,6 +37,19 @@ export const IPC_CHANNELS = {
   ANALYTICS_STREAK: "analytics:streak",
   ANALYTICS_SUMMARY: "analytics:summary",
 
+  // Task channels
+  TASK_CREATE: "task:create",
+  TASK_GET: "task:get",
+  TASK_LIST: "task:list",
+  TASK_UPDATE: "task:update",
+  TASK_DELETE: "task:delete",
+
+  // Subtask channels
+  SUBTASK_CREATE: "subtask:create",
+  SUBTASK_UPDATE: "subtask:update",
+  SUBTASK_DELETE: "subtask:delete",
+  SUBTASK_REORDER: "subtask:reorder",
+
   // Audio channels
   AUDIO_IMPORT: "audio:import",
   AUDIO_LIST_CUSTOM: "audio:list-custom",

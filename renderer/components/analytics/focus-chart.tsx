@@ -23,7 +23,7 @@ function formatXAxisDate(dateStr: string): string {
 
 export function FocusChart({ data }: FocusChartProps) {
   return (
-    <Card>
+    <Card className="card-hover-lift">
       <CardHeader>
         <CardTitle className="text-base">Daily Focus (Last 30 Days)</CardTitle>
       </CardHeader>
@@ -37,7 +37,7 @@ export function FocusChart({ data }: FocusChartProps) {
             <BarChart data={data}>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="hsl(var(--muted-foreground) / 0.2)"
+                stroke="oklch(0.5200 0.0400 150.0000 / 0.15)"
               />
               <XAxis
                 dataKey="date"
@@ -45,36 +45,40 @@ export function FocusChart({ data }: FocusChartProps) {
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                stroke="hsl(var(--muted-foreground))"
+                stroke="oklch(0.5200 0.0400 150.0000)"
               />
               <YAxis
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                stroke="hsl(var(--muted-foreground))"
+                stroke="oklch(0.5200 0.0400 150.0000)"
                 label={{
                   value: "Minutes",
                   angle: -90,
                   position: "insideLeft",
                   style: {
                     fontSize: 12,
-                    fill: "hsl(var(--muted-foreground))",
+                    fill: "oklch(0.5200 0.0400 150.0000)",
                   },
                 }}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
+                  backgroundColor: "oklch(0.9867 0.0046 80.7211)",
+                  border: "1px solid oklch(0.8700 0.0200 100.0000)",
+                  borderRadius: "12px",
                   fontSize: 13,
+                  boxShadow:
+                    "0 4px 16px oklch(0.0000 0.0000 0.0000 / 0.08), 0 1px 4px oklch(0.0000 0.0000 0.0000 / 0.04)",
+                  padding: "8px 12px",
                 }}
                 labelFormatter={formatXAxisDate}
                 formatter={(value: number) => [`${value} min`, "Focus"]}
+                cursor={{ fill: "oklch(0.5234 0.1347 144.1672 / 0.06)" }}
               />
               <Bar
                 dataKey="totalFocusMinutes"
-                fill="hsl(var(--primary))"
+                fill="oklch(0.5234 0.1347 144.1672)"
                 radius={[4, 4, 0, 0]}
               />
             </BarChart>

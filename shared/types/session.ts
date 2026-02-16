@@ -1,3 +1,5 @@
+import type { Task } from "./task.js";
+
 export interface Session {
   id: string;
   task: string;
@@ -14,6 +16,7 @@ export interface Session {
   status: "active" | "paused" | "completed" | "cancelled";
   startedAt: string;
   completedAt?: string;
+  tasks?: Task[];
 }
 
 export interface CreateSessionInput {
@@ -24,6 +27,7 @@ export interface CreateSessionInput {
   breakDuration?: number;
   longBreakDuration?: number;
   sessionsBeforeLongBreak?: number;
+  taskIds?: string[];
 }
 
 export interface UpdateSessionInput {
