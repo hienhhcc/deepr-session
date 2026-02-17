@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { getElectronAPI } from "@/lib/electron-api";
 
 export type TaskStatus = "todo" | "in_progress" | "done";
-export type TaskPriority = "low" | "medium" | "high" | "urgent";
+export type TaskPriority = "low" | "medium" | "high";
 
 export interface Subtask {
   id: string;

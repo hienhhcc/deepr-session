@@ -11,7 +11,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,8 +19,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { SubtaskList } from "./subtask-list";
+import { PriorityBadge } from "./priority-badge";
 import { cn } from "@/lib/utils";
-import type { Task, TaskPriority } from "@/stores/task.store";
+import type { Task } from "@/stores/task.store";
 
 interface TaskCardProps {
   task: Task;
@@ -44,13 +44,6 @@ const statusColors = {
   done: "text-primary",
 };
 
-const priorityConfig: Record<TaskPriority, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  low: { label: "Low", variant: "outline" },
-  medium: { label: "Medium", variant: "secondary" },
-  high: { label: "High", variant: "default" },
-  urgent: { label: "Urgent", variant: "destructive" },
-};
-
 export function TaskCard({
   task,
   onEdit,
@@ -61,7 +54,6 @@ export function TaskCard({
 }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const StatusIcon = statusIcons[task.status];
-  const priority = priorityConfig[task.priority];
   const doneCount = task.subtasks.filter((s) => s.done).length;
   const totalCount = task.subtasks.length;
 
@@ -89,9 +81,7 @@ export function TaskCard({
                 >
                   {task.name}
                 </h3>
-                <Badge variant={priority.variant} className="text-[10px] px-1.5 py-0 shrink-0">
-                  {priority.label}
-                </Badge>
+                <PriorityBadge priority={task.priority} className="shrink-0" />
               </div>
 
               {task.description && (

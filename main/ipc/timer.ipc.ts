@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../shared/types/ipc.js";
 import { timerService } from "../services/timer.service.js";
 import { getDatabase } from "../services/database.js";
+import { startBlocking, stopBlocking, DEFAULT_BLOCKED_DOMAINS, DEFAULT_BLOCKED_APPS } from "../services/blocker.service.js";
 
 export function registerTimerHandlers() {
   ipcMain.handle(
@@ -22,6 +23,13 @@ export function registerTimerHandlers() {
         row.sessions_before_long_break as number
       );
 
+      // Start blocking distractors
+      try {
+        await startBlocking(DEFAULT_BLOCKED_DOMAINS, DEFAULT_BLOCKED_APPS);
+      } catch (error) {
+        console.error("Failed to start blocker (user may have denied sudo):", error);
+      }
+
       return timerService.getState();
     }
   );
@@ -37,6 +45,13 @@ export function registerTimerHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.TIMER_STOP, async () => {
+    // Stop blocking before stopping timer
+    try {
+      await stopBlocking();
+    } catch (error) {
+      console.error("Failed to stop blocker:", error);
+    }
+
     timerService.stop();
     return timerService.getState();
   });
