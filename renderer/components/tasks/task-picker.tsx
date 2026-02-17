@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Plus, Search, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PriorityBadge } from "./priority-badge";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -53,7 +54,7 @@ export function TaskPicker({ selectedIds, onChange }: TaskPickerProps) {
     name: string;
     description?: string;
     status: "todo" | "in_progress" | "done";
-    priority: "low" | "medium" | "high" | "urgent";
+    priority: "low" | "medium" | "high";
   }) => {
     const task = await createTask(data);
     if (task) {
@@ -155,12 +156,7 @@ export function TaskPicker({ selectedIds, onChange }: TaskPickerProps) {
                           )}
                         </div>
                         <span className="truncate">{task.name}</span>
-                        <Badge
-                          variant="outline"
-                          className="ml-auto text-[10px] px-1.5 py-0 shrink-0"
-                        >
-                          {task.priority}
-                        </Badge>
+                        <PriorityBadge priority={task.priority} className="ml-auto shrink-0" />
                       </button>
                     );
                   })

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useSessionStore } from "@/stores/session.store";
 import { useTimer } from "@/hooks/useTimer";
+import { cn } from "@/lib/utils";
 
 interface Profile {
   id: string;
@@ -27,12 +28,15 @@ interface Profile {
   sessionsBeforeLongBreak?: number;
 }
 
-const DEFAULTS = {
-  focusDuration: 25,
-  breakDuration: 5,
-  longBreakDuration: 15,
-  sessionsBeforeLongBreak: 4,
-};
+const DURATION_PRESETS = [
+  { label: "1h", minutes: 60 },
+  { label: "2h", minutes: 120 },
+  { label: "4h", minutes: 240 },
+  { label: "8h", minutes: 480 },
+];
+
+const FOCUS_PER_CYCLE = 55; // 55 min focus per hour
+const BREAK_PER_CYCLE = 5;  // 5 min break per hour
 
 export function SessionSetup() {
   const { createSession, loading } = useSessionStore();
@@ -43,12 +47,9 @@ export function SessionSetup() {
   const [intention, setIntention] = useState("");
   const [profileId, setProfileId] = useState<string>("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [focusDuration, setFocusDuration] = useState(DEFAULTS.focusDuration);
-  const [breakDuration, setBreakDuration] = useState(DEFAULTS.breakDuration);
-  const [longBreakDuration, setLongBreakDuration] = useState(DEFAULTS.longBreakDuration);
-  const [sessionsBeforeLongBreak, setSessionsBeforeLongBreak] = useState(
-    DEFAULTS.sessionsBeforeLongBreak
-  );
+  const [totalDuration, setTotalDuration] = useState(60);
+  const [customDuration, setCustomDuration] = useState("");
+  const [isCustom, setIsCustom] = useState(false);
 
   useEffect(() => {
     const api = getElectronAPI();
@@ -61,22 +62,56 @@ export function SessionSetup() {
   const handleProfileChange = (value: string) => {
     setProfileId(value);
     if (value === "custom") {
-      setFocusDuration(DEFAULTS.focusDuration);
-      setBreakDuration(DEFAULTS.breakDuration);
-      setLongBreakDuration(DEFAULTS.longBreakDuration);
-      setSessionsBeforeLongBreak(DEFAULTS.sessionsBeforeLongBreak);
+      setTotalDuration(60);
+      setIsCustom(false);
+      setCustomDuration("");
       return;
     }
     const profile = profiles.find((p) => p.id === value);
     if (profile) {
-      setFocusDuration(profile.focusDuration ?? DEFAULTS.focusDuration);
-      setBreakDuration(profile.breakDuration ?? DEFAULTS.breakDuration);
-      setLongBreakDuration(profile.longBreakDuration ?? DEFAULTS.longBreakDuration);
-      setSessionsBeforeLongBreak(
-        profile.sessionsBeforeLongBreak ?? DEFAULTS.sessionsBeforeLongBreak
-      );
+      // Convert profile's focus duration + break pattern to total duration estimate
+      const focus = profile.focusDuration ?? 25;
+      const brk = profile.breakDuration ?? 5;
+      const cycles = profile.sessionsBeforeLongBreak ?? 4;
+      const estimated = (focus + brk) * cycles;
+      setTotalDuration(estimated);
+      setIsCustom(false);
+      setCustomDuration("");
     }
   };
+
+  const handlePresetClick = (minutes: number) => {
+    setTotalDuration(minutes);
+    setIsCustom(false);
+    setCustomDuration("");
+  };
+
+  const handleCustomFocus = () => {
+    setIsCustom(true);
+    setCustomDuration(String(totalDuration));
+  };
+
+  const handleCustomChange = (value: string) => {
+    // Allow empty string and digits only
+    if (value === "" || /^\d+$/.test(value)) {
+      setCustomDuration(value);
+      if (value !== "") {
+        const num = parseInt(value, 10);
+        if (num > 0) setTotalDuration(num);
+      }
+    }
+  };
+
+  const handleCustomBlur = () => {
+    if (!customDuration || parseInt(customDuration, 10) <= 0) {
+      // Reset to nearest preset or default
+      setCustomDuration("");
+      setIsCustom(false);
+      setTotalDuration(60);
+    }
+  };
+
+  const isPresetSelected = (minutes: number) => !isCustom && totalDuration === minutes;
 
   const [error, setError] = useState<string | null>(null);
 
@@ -89,10 +124,10 @@ export function SessionSetup() {
         task: task.trim() || "Focus session",
         intention: intention.trim() || undefined,
         profileId: profileId && profileId !== "custom" ? profileId : undefined,
-        focusDuration,
-        breakDuration,
-        longBreakDuration,
-        sessionsBeforeLongBreak,
+        focusDuration: FOCUS_PER_CYCLE,
+        breakDuration: BREAK_PER_CYCLE,
+        longBreakDuration: BREAK_PER_CYCLE, // no long break distinction
+        sessionsBeforeLongBreak: 999, // effectively no long break
         taskIds: taskIds.length > 0 ? taskIds : undefined,
       });
 
@@ -106,6 +141,18 @@ export function SessionSetup() {
       console.error("Failed to start session:", err);
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     }
+  };
+
+  // Compute display info
+  const cycles = Math.floor(totalDuration / 60);
+  const remainder = totalDuration % 60;
+  const breaks = cycles > 0 ? (remainder > 0 ? cycles : cycles - 1) : 0;
+
+  const formatDurationLabel = (min: number) => {
+    if (min < 60) return `${min} min`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
   return (
@@ -172,61 +219,60 @@ export function SessionSetup() {
           </div>
         )}
 
-        {/* Duration inputs */}
-        <div className="space-y-2">
+        {/* Duration */}
+        <div className="space-y-3">
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Duration
+            Session Duration
           </Label>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-muted-foreground">Focus (min)</span>
-              <Input
-                id="focus"
-                type="number"
-                min={1}
-                max={120}
-                value={focusDuration}
-                onChange={(e) => setFocusDuration(Number(e.target.value))}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-muted-foreground">Break (min)</span>
-              <Input
-                id="break"
-                type="number"
-                min={1}
-                max={60}
-                value={breakDuration}
-                onChange={(e) => setBreakDuration(Number(e.target.value))}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-muted-foreground">Long Break (min)</span>
-              <Input
-                id="longBreak"
-                type="number"
-                min={1}
-                max={60}
-                value={longBreakDuration}
-                onChange={(e) => setLongBreakDuration(Number(e.target.value))}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-muted-foreground">Sessions before long break</span>
-              <Input
-                id="sessions"
-                type="number"
-                min={1}
-                max={10}
-                value={sessionsBeforeLongBreak}
-                onChange={(e) => setSessionsBeforeLongBreak(Number(e.target.value))}
-                className="h-10"
-              />
-            </div>
+
+          <div className="flex gap-2">
+            {DURATION_PRESETS.map((preset) => (
+              <button
+                key={preset.minutes}
+                type="button"
+                onClick={() => handlePresetClick(preset.minutes)}
+                className={cn(
+                  "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
+                  isPresetSelected(preset.minutes)
+                    ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
+                    : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handleCustomFocus}
+              className={cn(
+                "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
+                isCustom
+                  ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
+                  : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+            >
+              Custom
+            </button>
           </div>
+
+          {isCustom && (
+            <div className="flex items-center gap-2">
+              <Input
+                value={customDuration}
+                onChange={(e) => handleCustomChange(e.target.value)}
+                onBlur={handleCustomBlur}
+                placeholder="Minutes"
+                className="h-10 w-28"
+                autoFocus
+              />
+              <span className="text-sm text-muted-foreground">minutes</span>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground/70">
+            {formatDurationLabel(totalDuration)} total
+            {breaks > 0 && ` · ${breaks} short break${breaks > 1 ? "s" : ""} (${BREAK_PER_CYCLE} min each)`}
+          </p>
         </div>
 
         {/* Error message */}

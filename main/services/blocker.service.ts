@@ -6,6 +6,14 @@ import fs from 'node:fs';
 
 const execAsync = promisify(exec);
 
+export const DEFAULT_BLOCKED_DOMAINS = [
+  "facebook.com", "www.facebook.com",
+  "youtube.com", "www.youtube.com",
+  "discord.com", "www.discord.com",
+];
+
+export const DEFAULT_BLOCKED_APPS = ["Discord"];
+
 const HOSTS_PATH = '/etc/hosts';
 const BLOCK_START_MARKER = '# DEEPR-SESSION-BLOCK-START';
 const BLOCK_END_MARKER = '# DEEPR-SESSION-BLOCK-END';
@@ -101,9 +109,18 @@ async function startAppMonitoring(): Promise<void> {
       state.detectedApps = detected;
 
       if (detected.length > 0) {
+        // Force-quit detected apps
+        for (const appName of detected) {
+          try {
+            await execAsync(`pkill -f "${appName}"`);
+          } catch {
+            // pkill returns non-zero if no process matched, ignore
+          }
+        }
+
         const notification = new Notification({
-          title: 'Distraction Detected',
-          body: `Blocked app${detected.length > 1 ? 's' : ''} running: ${detected.join(', ')}`,
+          title: 'Distraction Blocked',
+          body: `Force-quit blocked app${detected.length > 1 ? 's' : ''}: ${detected.join(', ')}`,
           urgency: 'critical',
         });
         notification.show();
