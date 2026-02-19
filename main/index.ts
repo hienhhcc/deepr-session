@@ -9,7 +9,7 @@ import { registerTimerHandlers } from "./ipc/timer.ipc.js";
 import { registerBlockerHandlers } from "./ipc/blocker.ipc.js";
 import { registerAnalyticsHandlers } from "./ipc/analytics.ipc.js";
 import { registerTaskHandlers } from "./ipc/tasks.ipc.js";
-import { cleanup as cleanupBlocker } from "./services/blocker.service.js";
+import { cleanup as cleanupBlocker, setupSudoless, startupCleanup as blockerStartupCleanup } from "./services/blocker.service.js";
 import { timerService } from "./services/timer.service.js";
 import { IPC_CHANNELS } from "../shared/types/ipc.js";
 
@@ -170,6 +170,16 @@ app.whenReady().then(() => {
     console.error("[deepr] FATAL: Failed to register handlers:", err);
   }
 
+  // Remove any leftover block entries from a previous crash/force-kill
+  blockerStartupCleanup().catch((err) => {
+    console.warn("[deepr] Blocker startup cleanup failed:", err);
+  });
+
+  // Set up passwordless blocker (one-time sudo prompt, then never again)
+  setupSudoless().catch((err) => {
+    console.warn("[deepr] Sudoless blocker setup skipped (user may have denied):", err);
+  });
+
   try {
     createWindow();
     console.log("[deepr] Window created");
@@ -211,9 +221,17 @@ app.on("before-quit", () => {
   app.isQuitting = true;
 });
 
-app.on("will-quit", async () => {
-  await cleanupBlocker();
-  closeDatabase();
+let cleanupDone = false;
+app.on("will-quit", (event) => {
+  if (cleanupDone) return;
+  event.preventDefault();
+  cleanupBlocker()
+    .catch((err) => console.error("[deepr] Blocker cleanup failed:", err))
+    .finally(() => {
+      closeDatabase();
+      cleanupDone = true;
+      app.quit();
+    });
 });
 
 export function getMainWindow() {

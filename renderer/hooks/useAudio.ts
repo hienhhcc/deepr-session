@@ -5,30 +5,29 @@ import { useAudioStore } from "@/stores/audio.store";
 
 export function useAudio() {
   const sounds = useAudioStore((s) => s.sounds);
-  const isPlaying = useAudioStore((s) => s.isPlaying);
-  const masterVolume = useAudioStore((s) => s.masterVolume);
-  const toggleSound = useAudioStore((s) => s.toggleSound);
+  const activeSoundId = useAudioStore((s) => s.activeSoundId);
+  const volume = useAudioStore((s) => s.volume);
+  const isEnabled = useAudioStore((s) => s.isEnabled);
+  const play = useAudioStore((s) => s.play);
+  const stop = useAudioStore((s) => s.stop);
+  const setEnabled = useAudioStore((s) => s.setEnabled);
   const setVolume = useAudioStore((s) => s.setVolume);
-  const setMasterVolume = useAudioStore((s) => s.setMasterVolume);
-  const playAll = useAudioStore((s) => s.playAll);
-  const stopAll = useAudioStore((s) => s.stopAll);
 
-  // Cleanup: stop all sounds on unmount
+  // Cleanup: stop sound on unmount
   useEffect(() => {
     return () => {
-      stopAll();
+      useAudioStore.getState().stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
     sounds,
-    isPlaying,
-    masterVolume,
-    toggleSound,
+    activeSoundId,
+    volume,
+    isEnabled,
+    play,
+    stop,
+    setEnabled,
     setVolume,
-    setMasterVolume,
-    playAll,
-    stopAll,
   };
 }

@@ -1,8 +1,9 @@
-import sudoPrompt from 'sudo-prompt';
+import sudoPrompt from '@vscode/sudo-prompt';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Notification } from 'electron';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const execAsync = promisify(exec);
 
@@ -19,12 +20,16 @@ const BLOCK_START_MARKER = '# DEEPR-SESSION-BLOCK-START';
 const BLOCK_END_MARKER = '# DEEPR-SESSION-BLOCK-END';
 const APP_CHECK_INTERVAL_MS = 10_000;
 
+const HELPER_SCRIPT_PATH = '/usr/local/bin/deepr-hosts-helper';
+const SUDOERS_PATH = '/etc/sudoers.d/deepr-session';
+
 interface BlockerState {
   active: boolean;
   blockedDomains: string[];
   blockedApps: string[];
   detectedApps: string[];
   monitoringInterval: ReturnType<typeof setInterval> | null;
+  sudolessReady: boolean;
 }
 
 const state: BlockerState = {
@@ -33,7 +38,10 @@ const state: BlockerState = {
   blockedApps: [],
   detectedApps: [],
   monitoringInterval: null,
+  sudolessReady: false,
 };
+
+// --- Sudo prompt (one-time setup only) ---
 
 function sudoExec(command: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,6 +57,96 @@ function sudoExec(command: string): Promise<string> {
       }
     );
   });
+}
+
+// --- Helper script for passwordless sudo ---
+
+const HELPER_SCRIPT_CONTENT = `#!/bin/bash
+# Deepr Session hosts file helper — only modifies /etc/hosts within marked blocks
+set -euo pipefail
+
+HOSTS_PATH="/etc/hosts"
+START_MARKER="# DEEPR-SESSION-BLOCK-START"
+END_MARKER="# DEEPR-SESSION-BLOCK-END"
+
+case "\${1:-}" in
+  block)
+    TMPFILE="\$2"
+    if [ ! -f "\$TMPFILE" ]; then
+      echo "Temp file not found: \$TMPFILE" >&2
+      exit 1
+    fi
+    cp "\$TMPFILE" "\$HOSTS_PATH"
+    rm -f "\$TMPFILE"
+    dscacheutil -flushcache 2>/dev/null || true
+    killall -HUP mDNSResponder 2>/dev/null || true
+    ;;
+  unblock)
+    TMPFILE="\$2"
+    if [ ! -f "\$TMPFILE" ]; then
+      echo "Temp file not found: \$TMPFILE" >&2
+      exit 1
+    fi
+    cp "\$TMPFILE" "\$HOSTS_PATH"
+    rm -f "\$TMPFILE"
+    dscacheutil -flushcache 2>/dev/null || true
+    killall -HUP mDNSResponder 2>/dev/null || true
+    ;;
+  *)
+    echo "Usage: deepr-hosts-helper {block|unblock} <tmpfile>" >&2
+    exit 1
+    ;;
+esac
+`;
+
+function isSudolessReady(): boolean {
+  try {
+    return fs.existsSync(HELPER_SCRIPT_PATH) && fs.existsSync(SUDOERS_PATH);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One-time setup: installs a helper script and sudoers rule so future
+ * hosts file modifications don't require a password prompt.
+ * This is the ONLY time the user sees a sudo prompt.
+ */
+export async function setupSudoless(): Promise<void> {
+  if (isSudolessReady()) {
+    state.sudolessReady = true;
+    return;
+  }
+
+  const username = os.userInfo().username;
+
+  // Write helper script to temp, then install with sudo
+  const tmpScript = '/tmp/deepr-hosts-helper-install';
+  fs.writeFileSync(tmpScript, HELPER_SCRIPT_CONTENT, { mode: 0o755 });
+
+  // Sudoers entry: allow this user to run ONLY the helper script without password
+  const sudoersContent = `${username} ALL=(root) NOPASSWD: ${HELPER_SCRIPT_PATH}\n`;
+  const tmpSudoers = '/tmp/deepr-sudoers-install';
+  fs.writeFileSync(tmpSudoers, sudoersContent, { mode: 0o440 });
+
+  // Install both with a single sudo prompt
+  await sudoExec(
+    `cp ${tmpScript} ${HELPER_SCRIPT_PATH} && ` +
+    `chmod 755 ${HELPER_SCRIPT_PATH} && ` +
+    `chown root:wheel ${HELPER_SCRIPT_PATH} && ` +
+    `cp ${tmpSudoers} ${SUDOERS_PATH} && ` +
+    `chmod 440 ${SUDOERS_PATH} && ` +
+    `chown root:wheel ${SUDOERS_PATH} && ` +
+    `rm -f ${tmpScript} ${tmpSudoers}`
+  );
+
+  state.sudolessReady = true;
+}
+
+// --- Hosts file operations (passwordless after setup) ---
+
+async function runHelper(action: string, tmpFile: string): Promise<void> {
+  await execAsync(`sudo ${HELPER_SCRIPT_PATH} ${action} ${tmpFile}`);
 }
 
 function buildHostsEntries(domains: string[]): string {
@@ -72,17 +170,24 @@ function removeBlockEntriesFromContent(content: string): string {
 }
 
 async function writeHostsFile(content: string): Promise<void> {
-  // Write to a temp file, then move with sudo
   const tmpPath = '/tmp/deepr-session-hosts-tmp';
   fs.writeFileSync(tmpPath, content, 'utf-8');
-  await sudoExec(`cp ${tmpPath} ${HOSTS_PATH} && rm ${tmpPath}`);
-  // Flush DNS cache on macOS
-  try {
-    await sudoExec('dscacheutil -flushcache && killall -HUP mDNSResponder');
-  } catch {
-    // DNS flush is best-effort
+
+  if (state.sudolessReady) {
+    // Passwordless path — no prompt
+    await runHelper('block', tmpPath);
+  } else {
+    // Fallback to sudo-prompt (shows password dialog)
+    await sudoExec(`cp ${tmpPath} ${HOSTS_PATH} && rm ${tmpPath}`);
+    try {
+      await sudoExec('dscacheutil -flushcache && killall -HUP mDNSResponder');
+    } catch {
+      // DNS flush is best-effort
+    }
   }
 }
+
+// --- App monitoring ---
 
 async function startAppMonitoring(): Promise<void> {
   stopAppMonitoring();
@@ -138,6 +243,8 @@ function stopAppMonitoring(): void {
   }
 }
 
+// --- Public API ---
+
 export async function startBlocking(
   domains: string[],
   apps: string[]
@@ -188,6 +295,7 @@ export function getStatus() {
     blockedDomains: [...state.blockedDomains],
     blockedApps: [...state.blockedApps],
     detectedApps: [...state.detectedApps],
+    sudolessReady: state.sudolessReady,
   };
 }
 
@@ -198,5 +306,22 @@ export async function emergencyUnlock(): Promise<void> {
 export async function cleanup(): Promise<void> {
   if (state.active) {
     await stopBlocking();
+  }
+}
+
+/**
+ * Called once on app startup to remove any leftover block entries from a
+ * previous session that crashed or was force-killed before cleanup ran.
+ */
+export async function startupCleanup(): Promise<void> {
+  try {
+    const currentHosts = fs.readFileSync(HOSTS_PATH, 'utf-8');
+    if (!currentHosts.includes(BLOCK_START_MARKER)) return;
+    const cleanedHosts = removeBlockEntriesFromContent(currentHosts);
+    state.sudolessReady = isSudolessReady();
+    await writeHostsFile(cleanedHosts);
+    console.log('[deepr] Startup: removed leftover blocker entries from /etc/hosts');
+  } catch (error) {
+    console.error('[deepr] Startup cleanup failed:', error);
   }
 }

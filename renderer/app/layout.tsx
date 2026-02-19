@@ -12,6 +12,7 @@ import {
   TreePine,
   Leaf,
   ListTodo,
+  Music2,
 } from "lucide-react";
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/history", label: "History", icon: History },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/profiles", label: "Profiles", icon: UserCircle },
+  { href: "/sounds", label: "Sounds", icon: Music2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

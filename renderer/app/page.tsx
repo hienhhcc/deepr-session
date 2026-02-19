@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
-  Star,
   TreePine,
   Target,
   Clock,
@@ -10,55 +9,24 @@ import {
   Play,
   SkipForward,
   Square,
+  ListTodo,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { SessionSetup } from "@/components/timer/session-setup";
 import { TimerDisplay } from "@/components/timer/timer-display";
+import { AmbientPlayer } from "@/components/audio/ambient-player";
+import { TaskPicker } from "@/components/tasks/task-picker";
 import { useTimer } from "@/hooks/useTimer";
 import { useSessionStore } from "@/stores/session.store";
-import { formatTime, cn } from "@/lib/utils";
+import { useAudioStore } from "@/stores/audio.store";
+import { formatTime } from "@/lib/utils";
 
 export default function FocusPage() {
   const { status, accumulatedFocusTime, currentPomodoro } = useTimer();
   const { activeSession, endSession } = useSessionStore();
 
-  const [showRating, setShowRating] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [notes, setNotes] = useState("");
-
-  const handleStop = useCallback(() => {
-    setShowRating(true);
-  }, []);
-
-  const handleSubmitRating = async () => {
-    await endSession(rating > 0 ? rating : undefined, notes.trim() || undefined);
-    setShowRating(false);
-    setRating(0);
-    setHoverRating(0);
-    setNotes("");
-  };
-
-  const handleSkipRating = async () => {
-    await endSession();
-    setShowRating(false);
-    setRating(0);
-    setHoverRating(0);
-    setNotes("");
-  };
-
   // Show session setup when idle and no active session
-  if (!activeSession && status === "idle" && !showRating) {
+  if (!activeSession && status === "idle") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-6">
         <SessionSetup />
@@ -98,91 +66,63 @@ export default function FocusPage() {
           </div>
         )}
 
-        {/* Controls - wrap stop to show rating */}
+        {/* Session tasks */}
+        <SessionTaskManager />
+
+        {/* Ambient Sounds */}
+        <div className="max-w-md w-full mx-auto">
+          <AmbientPlayer />
+        </div>
+
+        {/* Controls */}
         {status !== "idle" && (
-          <TimerControlsWithRating onStop={handleStop} />
+          <TimerControls onStop={endSession} />
         )}
       </div>
-
-      {/* Rating Dialog */}
-      <Dialog open={showRating} onOpenChange={setShowRating}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-xl">Session Complete</DialogTitle>
-            <DialogDescription>
-              How was your focus during this session?
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-5 py-3">
-            {/* Star rating */}
-            <div className="space-y-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Focus Rating
-              </Label>
-              <div className="flex items-center justify-center gap-1.5">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    className="p-1.5 transition-transform hover:scale-125 active:scale-95"
-                    onMouseEnter={() => setHoverRating(star)}
-                    onMouseLeave={() => setHoverRating(0)}
-                    onClick={() => setRating(star)}
-                  >
-                    <Star
-                      className={cn(
-                        "h-8 w-8 transition-colors",
-                        (hoverRating || rating) >= star
-                          ? "fill-primary text-primary"
-                          : "text-muted-foreground/25"
-                      )}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label
-                htmlFor="session-notes"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Notes <span className="font-normal normal-case tracking-normal">(optional)</span>
-              </Label>
-              <Textarea
-                id="session-notes"
-                placeholder="Any reflections on this session?"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={handleSkipRating}>
-              Skip
-            </Button>
-            <Button onClick={handleSubmitRating}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
-/**
- * Wrapper that intercepts the stop action to show the rating dialog
- * instead of immediately ending the session.
- */
-function TimerControlsWithRating({ onStop }: { onStop: () => void }) {
+function SessionTaskManager() {
+  const { activeSession, updateSessionTasks } = useSessionStore();
+  // Local state drives the visual selection — independent of async IPC
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Initialise from session when it becomes available (once, on mount / session change)
+  useEffect(() => {
+    if (activeSession) {
+      setSelectedIds((activeSession.tasks ?? []).map((t) => t.id));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession?.id]);
+
+  if (!activeSession) return null;
+
+  const handleChange = (ids: string[]) => {
+    setSelectedIds(ids);          // instant visual feedback
+    updateSessionTasks(ids);      // persist in background
+  };
+
+  return (
+    <div className="max-w-md w-full mx-auto text-left">
+      <div className="flex items-center gap-2 mb-2">
+        <ListTodo className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Tasks
+        </span>
+      </div>
+      <TaskPicker selectedIds={selectedIds} onChange={handleChange} />
+    </div>
+  );
+}
+
+function TimerControls({ onStop }: { onStop: () => Promise<void> }) {
   const { status, pause, resume, skip, stop } = useTimer();
 
   const handleStop = async () => {
+    useAudioStore.getState().stop();
     await stop();
-    onStop();
+    await onStop();
   };
 
   if (status === "idle") return null;

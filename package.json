@@ -29,11 +29,11 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@vscode/sudo-prompt": "^9.3.2",
     "better-sqlite3": "^12.6.2",
     "drizzle-orm": "^0.38.0",
     "howler": "^2.2.4",
     "recharts": "^2.15.0",
-    "sudo-prompt": "^9.2.1",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

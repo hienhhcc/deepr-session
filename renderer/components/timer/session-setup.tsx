@@ -6,7 +6,6 @@ import { getElectronAPI } from "@/lib/electron-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { TaskPicker } from "@/components/tasks/task-picker";
 import {
   Select,
@@ -16,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSessionStore } from "@/stores/session.store";
+import { useAudioStore, type SoundPreset } from "@/stores/audio.store";
 import { useTimer } from "@/hooks/useTimer";
 import { cn } from "@/lib/utils";
 
@@ -23,9 +23,7 @@ interface Profile {
   id: string;
   name: string;
   focusDuration?: number;
-  breakDuration?: number;
-  longBreakDuration?: number;
-  sessionsBeforeLongBreak?: number;
+  soundPreset?: string;
 }
 
 const DURATION_PRESETS = [
@@ -35,8 +33,8 @@ const DURATION_PRESETS = [
   { label: "8h", minutes: 480 },
 ];
 
-const FOCUS_PER_CYCLE = 55; // 55 min focus per hour
-const BREAK_PER_CYCLE = 5;  // 5 min break per hour
+const FOCUS_PER_CYCLE = 55;
+const BREAK_PER_CYCLE = 5;
 
 export function SessionSetup() {
   const { createSession, loading } = useSessionStore();
@@ -44,12 +42,14 @@ export function SessionSetup() {
 
   const [task, setTask] = useState("");
   const [taskIds, setTaskIds] = useState<string[]>([]);
-  const [intention, setIntention] = useState("");
   const [profileId, setProfileId] = useState<string>("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [totalDuration, setTotalDuration] = useState(60);
   const [customDuration, setCustomDuration] = useState("");
   const [isCustom, setIsCustom] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isProfileSelected = !!profileId && profileId !== "custom";
 
   useEffect(() => {
     const api = getElectronAPI();
@@ -69,12 +69,7 @@ export function SessionSetup() {
     }
     const profile = profiles.find((p) => p.id === value);
     if (profile) {
-      // Convert profile's focus duration + break pattern to total duration estimate
-      const focus = profile.focusDuration ?? 25;
-      const brk = profile.breakDuration ?? 5;
-      const cycles = profile.sessionsBeforeLongBreak ?? 4;
-      const estimated = (focus + brk) * cycles;
-      setTotalDuration(estimated);
+      setTotalDuration(profile.focusDuration ?? 60);
       setIsCustom(false);
       setCustomDuration("");
     }
@@ -92,7 +87,6 @@ export function SessionSetup() {
   };
 
   const handleCustomChange = (value: string) => {
-    // Allow empty string and digits only
     if (value === "" || /^\d+$/.test(value)) {
       setCustomDuration(value);
       if (value !== "") {
@@ -104,7 +98,6 @@ export function SessionSetup() {
 
   const handleCustomBlur = () => {
     if (!customDuration || parseInt(customDuration, 10) <= 0) {
-      // Reset to nearest preset or default
       setCustomDuration("");
       setIsCustom(false);
       setTotalDuration(60);
@@ -113,27 +106,35 @@ export function SessionSetup() {
 
   const isPresetSelected = (minutes: number) => !isCustom && totalDuration === minutes;
 
-  const [error, setError] = useState<string | null>(null);
-
   const handleStart = async () => {
-    if (!task.trim() && taskIds.length === 0) return;
     setError(null);
-
     try {
       const session = await createSession({
         task: task.trim() || "Focus session",
-        intention: intention.trim() || undefined,
-        profileId: profileId && profileId !== "custom" ? profileId : undefined,
+        profileId: isProfileSelected ? profileId : undefined,
         focusDuration: FOCUS_PER_CYCLE,
         breakDuration: BREAK_PER_CYCLE,
-        longBreakDuration: BREAK_PER_CYCLE, // no long break distinction
-        sessionsBeforeLongBreak: 999, // effectively no long break
+        longBreakDuration: BREAK_PER_CYCLE,
+        sessionsBeforeLongBreak: 999,
         taskIds: taskIds.length > 0 ? taskIds : undefined,
       });
 
       if (!session) {
         setError("Failed to create session. Check the developer console for details.");
         return;
+      }
+
+      // Auto-apply sound preset from profile
+      if (isProfileSelected) {
+        const profile = profiles.find((p) => p.id === profileId);
+        if (profile?.soundPreset) {
+          try {
+            const preset = JSON.parse(profile.soundPreset) as SoundPreset;
+            useAudioStore.getState().applyPreset(preset);
+          } catch {
+            // Invalid preset JSON, skip
+          }
+        }
       }
 
       await start(session.id);
@@ -143,7 +144,6 @@ export function SessionSetup() {
     }
   };
 
-  // Compute display info
   const cycles = Math.floor(totalDuration / 60);
   const remainder = totalDuration % 60;
   const breaks = cycles > 0 ? (remainder > 0 ? cycles : cycles - 1) : 0;
@@ -169,35 +169,7 @@ export function SessionSetup() {
       </div>
 
       <div className="space-y-5">
-        {/* Tasks */}
-        <div className="space-y-2">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Tasks *
-          </Label>
-          <TaskPicker selectedIds={taskIds} onChange={setTaskIds} />
-          <Input
-            placeholder="Or type a quick task name..."
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            className="h-10 text-sm"
-          />
-        </div>
-
-        {/* Intention */}
-        <div className="space-y-2">
-          <Label htmlFor="intention" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Intention <span className="font-normal normal-case tracking-normal">(optional)</span>
-          </Label>
-          <Textarea
-            id="intention"
-            placeholder="What do you want to accomplish?"
-            value={intention}
-            onChange={(e) => setIntention(e.target.value)}
-            rows={2}
-          />
-        </div>
-
-        {/* Profile selector */}
+        {/* Profile selector — always on top */}
         {profiles.length > 0 && (
           <div className="space-y-2">
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -219,61 +191,79 @@ export function SessionSetup() {
           </div>
         )}
 
-        {/* Duration */}
-        <div className="space-y-3">
-          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Session Duration
-          </Label>
+        {/* Tasks — hidden when a real profile is selected */}
+        {!isProfileSelected && (
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Tasks <span className="font-normal normal-case tracking-normal">(optional)</span>
+            </Label>
+            <TaskPicker selectedIds={taskIds} onChange={setTaskIds} />
+            <Input
+              placeholder="Or type a quick task name..."
+              value={task}
+              onChange={(e) => setTask(e.target.value)}
+              className="h-10 text-sm"
+            />
+          </div>
+        )}
 
-          <div className="flex gap-2">
-            {DURATION_PRESETS.map((preset) => (
+        {/* Duration — hidden when a real profile is selected */}
+        {!isProfileSelected && (
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Session Duration
+            </Label>
+
+            <div className="flex gap-2">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.minutes}
+                  type="button"
+                  onClick={() => handlePresetClick(preset.minutes)}
+                  className={cn(
+                    "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
+                    isPresetSelected(preset.minutes)
+                      ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
+                      : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
               <button
-                key={preset.minutes}
                 type="button"
-                onClick={() => handlePresetClick(preset.minutes)}
+                onClick={handleCustomFocus}
                 className={cn(
                   "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
-                  isPresetSelected(preset.minutes)
+                  isCustom
                     ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
                     : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 )}
               >
-                {preset.label}
+                Custom
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleCustomFocus}
-              className={cn(
-                "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
-                isCustom
-                  ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
-                  : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              )}
-            >
-              Custom
-            </button>
-          </div>
-
-          {isCustom && (
-            <div className="flex items-center gap-2">
-              <Input
-                value={customDuration}
-                onChange={(e) => handleCustomChange(e.target.value)}
-                onBlur={handleCustomBlur}
-                placeholder="Minutes"
-                className="h-10 w-28"
-                autoFocus
-              />
-              <span className="text-sm text-muted-foreground">minutes</span>
             </div>
-          )}
 
-          <p className="text-xs text-muted-foreground/70">
-            {formatDurationLabel(totalDuration)} total
-            {breaks > 0 && ` · ${breaks} short break${breaks > 1 ? "s" : ""} (${BREAK_PER_CYCLE} min each)`}
-          </p>
-        </div>
+            {isCustom && (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={customDuration}
+                  onChange={(e) => handleCustomChange(e.target.value)}
+                  onBlur={handleCustomBlur}
+                  placeholder="Minutes"
+                  className="h-10 w-28"
+                  autoFocus
+                />
+                <span className="text-sm text-muted-foreground">minutes</span>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground/70">
+              {formatDurationLabel(totalDuration)} total
+              {breaks > 0 && ` · ${breaks} short break${breaks > 1 ? "s" : ""} (${BREAK_PER_CYCLE} min each)`}
+            </p>
+          </div>
+        )}
 
         {/* Error message */}
         {error && (
@@ -287,7 +277,7 @@ export function SessionSetup() {
           className="w-full gap-2.5 text-base py-6 rounded-xl shadow-md hover:shadow-lg transition-all"
           size="lg"
           onClick={handleStart}
-          disabled={(!task.trim() && taskIds.length === 0) || loading}
+          disabled={loading}
         >
           <Play className="h-5 w-5" />
           {loading ? "Starting..." : "Start Session"}

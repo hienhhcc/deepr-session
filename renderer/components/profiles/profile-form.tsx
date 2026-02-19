@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Check } from "lucide-react";
 import { useProfileStore } from "@/stores/profile.store";
+import { useAudioStore, type SoundPreset } from "@/stores/audio.store";
+import { AmbientPlayer } from "@/components/audio/ambient-player";
 import { cn } from "@/lib/utils";
 
 const COLOR_PRESETS = [
@@ -24,6 +26,13 @@ const COLOR_PRESETS = [
   { name: "Lavender", value: "#a855f7" },
   { name: "Rose", value: "#ec4899" },
   { name: "Amber", value: "#eab308" },
+];
+
+const DURATION_PRESETS = [
+  { label: "1h", minutes: 60 },
+  { label: "2h", minutes: 120 },
+  { label: "4h", minutes: 240 },
+  { label: "8h", minutes: 480 },
 ];
 
 interface ProfileFormProps {
@@ -39,53 +48,94 @@ export function ProfileForm({ profile, open, onOpenChange }: ProfileFormProps) {
 
   const [name, setName] = useState("");
   const [color, setColor] = useState(COLOR_PRESETS[0].value);
-  const [focusDuration, setFocusDuration] = useState(25);
-  const [breakDuration, setBreakDuration] = useState(5);
-  const [longBreakDuration, setLongBreakDuration] = useState(15);
-  const [sessionsBeforeLongBreak, setSessionsBeforeLongBreak] = useState(4);
+  const [focusDuration, setFocusDuration] = useState(60);
+  const [customDuration, setCustomDuration] = useState("");
+  const [isCustom, setIsCustom] = useState(false);
 
   useEffect(() => {
     if (open) {
       if (profile) {
         setName(profile.name);
         setColor(profile.color);
-        setFocusDuration(profile.focusDuration);
-        setBreakDuration(profile.breakDuration);
-        setLongBreakDuration(profile.longBreakDuration);
-        setSessionsBeforeLongBreak(profile.sessionsBeforeLongBreak);
+        const dur = profile.focusDuration;
+        const isPreset = DURATION_PRESETS.some((p) => p.minutes === dur);
+        setFocusDuration(dur);
+        setIsCustom(!isPreset);
+        setCustomDuration(!isPreset ? String(dur) : "");
+        // Apply saved sound preset for preview
+        if (profile.soundPreset) {
+          try {
+            const preset = JSON.parse(profile.soundPreset) as SoundPreset;
+            useAudioStore.getState().applyPreset(preset);
+          } catch {
+            // Invalid preset, ignore
+          }
+        }
       } else {
         setName("");
         setColor(COLOR_PRESETS[0].value);
-        setFocusDuration(25);
-        setBreakDuration(5);
-        setLongBreakDuration(15);
-        setSessionsBeforeLongBreak(4);
+        setFocusDuration(60);
+        setIsCustom(false);
+        setCustomDuration("");
       }
+    } else {
+      // Dialog closed — stop preview sounds
+      useAudioStore.getState().stop();
     }
   }, [open, profile]);
+
+  const handlePresetClick = (minutes: number) => {
+    setFocusDuration(minutes);
+    setIsCustom(false);
+    setCustomDuration("");
+  };
+
+  const handleCustomFocus = () => {
+    setIsCustom(true);
+    setCustomDuration(String(focusDuration));
+  };
+
+  const handleCustomChange = (value: string) => {
+    if (value === "" || /^\d+$/.test(value)) {
+      setCustomDuration(value);
+      if (value !== "") {
+        const num = parseInt(value, 10);
+        if (num > 0) setFocusDuration(num);
+      }
+    }
+  };
+
+  const handleCustomBlur = () => {
+    if (!customDuration || parseInt(customDuration, 10) <= 0) {
+      setCustomDuration("");
+      setIsCustom(false);
+      setFocusDuration(60);
+    }
+  };
+
+  const isPresetSelected = (minutes: number) => !isCustom && focusDuration === minutes;
 
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
     try {
+      const preset = useAudioStore.getState().getPreset();
+      const soundPreset = preset ? JSON.stringify(preset) : undefined;
+
       if (profile) {
         await updateProfile({
           id: profile.id,
           name: name.trim(),
           color,
           focusDuration,
-          breakDuration,
-          longBreakDuration,
-          sessionsBeforeLongBreak,
+          soundPreset,
         });
       } else {
         await createProfile({
           name: name.trim(),
           color,
           focusDuration,
-          breakDuration,
-          longBreakDuration,
-          sessionsBeforeLongBreak,
+          soundPreset,
         });
       }
       onOpenChange(false);
@@ -96,7 +146,7 @@ export function ProfileForm({ profile, open, onOpenChange }: ProfileFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {profile ? "Edit Profile" : "New Profile"}
@@ -121,7 +171,7 @@ export function ProfileForm({ profile, open, onOpenChange }: ProfileFormProps) {
           </div>
 
           {/* Color */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>Color</Label>
             <div className="flex items-center gap-2">
               {COLOR_PRESETS.map((preset) => (
@@ -147,56 +197,58 @@ export function ProfileForm({ profile, open, onOpenChange }: ProfileFormProps) {
             </div>
           </div>
 
-          {/* Timer Settings */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="focus-duration">Focus (min)</Label>
-              <Input
-                id="focus-duration"
-                type="number"
-                min={1}
-                max={120}
-                value={focusDuration}
-                onChange={(e) => setFocusDuration(Number(e.target.value))}
-              />
+          {/* Session Duration */}
+          <div className="space-y-3">
+            <Label>Session Duration</Label>
+            <div className="flex gap-2">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset.minutes}
+                  type="button"
+                  onClick={() => handlePresetClick(preset.minutes)}
+                  className={cn(
+                    "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
+                    isPresetSelected(preset.minutes)
+                      ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
+                      : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={handleCustomFocus}
+                className={cn(
+                  "flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150",
+                  isCustom
+                    ? "bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20"
+                    : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                )}
+              >
+                Custom
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="break-duration">Break (min)</Label>
-              <Input
-                id="break-duration"
-                type="number"
-                min={1}
-                max={60}
-                value={breakDuration}
-                onChange={(e) => setBreakDuration(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="long-break-duration">Long Break (min)</Label>
-              <Input
-                id="long-break-duration"
-                type="number"
-                min={1}
-                max={60}
-                value={longBreakDuration}
-                onChange={(e) => setLongBreakDuration(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sessions-before-long-break">
-                Rounds before long break
-              </Label>
-              <Input
-                id="sessions-before-long-break"
-                type="number"
-                min={1}
-                max={12}
-                value={sessionsBeforeLongBreak}
-                onChange={(e) =>
-                  setSessionsBeforeLongBreak(Number(e.target.value))
-                }
-              />
-            </div>
+
+            {isCustom && (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={customDuration}
+                  onChange={(e) => handleCustomChange(e.target.value)}
+                  onBlur={handleCustomBlur}
+                  placeholder="Minutes"
+                  className="h-10 w-28"
+                  autoFocus
+                />
+                <span className="text-sm text-muted-foreground">minutes</span>
+              </div>
+            )}
+          </div>
+
+          {/* Ambient Sound */}
+          <div className="space-y-2">
+            <Label>Ambient Sound</Label>
+            <AmbientPlayer />
           </div>
         </div>
 
