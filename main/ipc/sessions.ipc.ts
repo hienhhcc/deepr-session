@@ -177,4 +177,22 @@ export function registerSessionHandlers() {
     db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
     return { success: true };
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.SESSION_UPDATE_TASKS,
+    async (_event, sessionId: string, taskIds: string[]) => {
+      const db = getDatabase();
+      db.prepare("DELETE FROM session_tasks WHERE session_id = ?").run(sessionId);
+      if (taskIds.length > 0) {
+        const insert = db.prepare(
+          "INSERT INTO session_tasks (session_id, task_id, sort_order) VALUES (?, ?, ?)"
+        );
+        for (let i = 0; i < taskIds.length; i++) {
+          insert.run(sessionId, taskIds[i], i);
+        }
+      }
+      const tasks = fetchSessionTasks(db, sessionId);
+      return tasks;
+    }
+  );
 }

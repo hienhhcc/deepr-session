@@ -5,6 +5,7 @@ export const IPC_CHANNELS = {
   SESSION_GET: "session:get",
   SESSION_LIST: "session:list",
   SESSION_UPDATE: "session:update",
+  SESSION_UPDATE_TASKS: "session:update-tasks",
   SESSION_DELETE: "session:delete",
 
   // Timer channels

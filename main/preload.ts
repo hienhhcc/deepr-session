@@ -12,6 +12,8 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.SESSION_UPDATE, input),
     delete: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.SESSION_DELETE, id),
+    updateTasks: (sessionId: string, taskIds: string[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SESSION_UPDATE_TASKS, sessionId, taskIds),
   },
 
   timer: {

@@ -1,120 +1,190 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 // Conditionally import Howl to handle SSR
-const { Howl } = typeof window !== "undefined" ? require("howler") : { Howl: null };
+const { Howl } =
+  typeof window !== "undefined" ? require("howler") : { Howl: null };
 
 export interface SoundConfig {
   id: string;
   name: string;
   icon: string;
   src: string;
+  isDefault?: boolean;
+}
+
+export interface SoundPreset {
+  soundId: string;
   volume: number;
-  isActive: boolean;
-  howl?: any;
 }
 
 interface AudioState {
+  // Persisted
   sounds: SoundConfig[];
-  isPlaying: boolean;
-  masterVolume: number;
-  toggleSound: (id: string) => void;
-  setVolume: (id: string, volume: number) => void;
-  setMasterVolume: (volume: number) => void;
-  playAll: () => void;
-  stopAll: () => void;
+  // Runtime (not persisted)
+  activeSoundId: string | null;
+  volume: number;
+  isEnabled: boolean;
+  howl: any | null;
+  // Actions
+  setSounds: (sounds: SoundConfig[]) => void;
+  addSound: (sound: SoundConfig) => void;
+  removeSound: (id: string) => void;
+  play: (id: string) => void;
+  stop: () => void;
+  setEnabled: (enabled: boolean) => void;
+  setVolume: (volume: number) => void;
+  applyPreset: (preset: SoundPreset) => void;
+  getPreset: () => SoundPreset | null;
 }
 
-const defaultSounds: SoundConfig[] = [
-  { id: "rain", name: "Rain", icon: "CloudRain", src: "/sounds/rain.mp3", volume: 0.5, isActive: false },
-  { id: "forest", name: "Forest", icon: "TreePine", src: "/sounds/forest.mp3", volume: 0.5, isActive: false },
-  { id: "cafe", name: "Cafe", icon: "Coffee", src: "/sounds/cafe.mp3", volume: 0.5, isActive: false },
-  { id: "fireplace", name: "Fireplace", icon: "Flame", src: "/sounds/fireplace.mp3", volume: 0.5, isActive: false },
-  { id: "ocean", name: "Ocean", icon: "Waves", src: "/sounds/ocean.mp3", volume: 0.5, isActive: false },
-  { id: "white-noise", name: "White Noise", icon: "Radio", src: "/sounds/white-noise.mp3", volume: 0.5, isActive: false },
+export const DEFAULT_SOUNDS: SoundConfig[] = [
+  { id: "rain", name: "Rain", icon: "CloudRain", src: "/sounds/rain.mp3", isDefault: true },
+  { id: "forest", name: "Forest", icon: "TreePine", src: "/sounds/forest.mp3", isDefault: true },
+  { id: "cafe", name: "Cafe", icon: "Coffee", src: "/sounds/cafe.mp3", isDefault: true },
+  { id: "fireplace", name: "Fireplace", icon: "Flame", src: "/sounds/fireplace.mp3", isDefault: true },
+  { id: "ocean", name: "Ocean", icon: "Waves", src: "/sounds/ocean.mp3", isDefault: true },
+  { id: "white-noise", name: "White Noise", icon: "Radio", src: "/sounds/white-noise.mp3", isDefault: true },
 ];
 
-export const useAudioStore = create<AudioState>((set, get) => ({
-  sounds: defaultSounds,
-  isPlaying: false,
-  masterVolume: 0.8,
+export const useAudioStore = create<AudioState>()(
+  persist(
+    (set, get) => ({
+      sounds: DEFAULT_SOUNDS,
+      activeSoundId: null,
+      volume: 0.7,
+      isEnabled: false,
+      howl: null,
 
-  toggleSound: (id: string) => {
-    const { sounds, masterVolume } = get();
-    const updatedSounds = sounds.map((sound) => {
-      if (sound.id !== id) return sound;
+      setSounds: (sounds: SoundConfig[]) => set({ sounds }),
 
-      if (sound.isActive) {
-        // Stop and unload the Howler instance
-        if (sound.howl) {
-          sound.howl.stop();
-          sound.howl.unload();
+      addSound: (sound: SoundConfig) =>
+        set((state) => ({ sounds: [...state.sounds, sound] })),
+
+      removeSound: (id: string) => {
+        const { activeSoundId } = get();
+        if (activeSoundId === id) {
+          get().stop();
         }
-        return { ...sound, isActive: false, howl: undefined };
-      } else {
-        // Create a new Howler instance and play it
-        if (!Howl) return { ...sound, isActive: true };
+        set((state) => ({
+          sounds: state.sounds.filter((s) => s.id !== id),
+        }));
+      },
+
+      play: (id: string) => {
+        const { sounds, volume, howl: currentHowl } = get();
+        const sound = sounds.find((s) => s.id === id);
+        if (!sound) return;
+
+        // Stop current sound
+        if (currentHowl) {
+          currentHowl.stop();
+          currentHowl.unload();
+        }
+
+        if (!Howl) {
+          set({ activeSoundId: id, isEnabled: true, howl: null });
+          return;
+        }
+
         const howl = new Howl({
           src: [sound.src],
-          volume: sound.volume * masterVolume,
+          volume,
           loop: true,
         });
         howl.play();
-        return { ...sound, isActive: true, howl };
-      }
-    });
+        set({ activeSoundId: id, isEnabled: true, howl });
+      },
 
-    const hasActive = updatedSounds.some((s) => s.isActive);
-    set({ sounds: updatedSounds, isPlaying: hasActive });
-  },
+      stop: () => {
+        const { howl } = get();
+        if (howl) {
+          howl.stop();
+          howl.unload();
+        }
+        set({ activeSoundId: null, isEnabled: false, howl: null });
+      },
 
-  setVolume: (id: string, volume: number) => {
-    const { sounds, masterVolume } = get();
-    const updatedSounds = sounds.map((sound) => {
-      if (sound.id !== id) return sound;
-      if (sound.howl) {
-        sound.howl.volume(volume * masterVolume);
-      }
-      return { ...sound, volume };
-    });
-    set({ sounds: updatedSounds });
-  },
+      setEnabled: (enabled: boolean) => {
+        const { activeSoundId, sounds, volume, howl: currentHowl } = get();
+        if (enabled) {
+          // If there's a previously selected sound, resume it
+          if (activeSoundId) {
+            const sound = sounds.find((s) => s.id === activeSoundId);
+            if (sound && Howl) {
+              if (currentHowl) {
+                currentHowl.stop();
+                currentHowl.unload();
+              }
+              const howl = new Howl({
+                src: [sound.src],
+                volume,
+                loop: true,
+              });
+              howl.play();
+              set({ isEnabled: true, howl });
+              return;
+            }
+          }
+          set({ isEnabled: true });
+        } else {
+          if (currentHowl) {
+            currentHowl.stop();
+            currentHowl.unload();
+          }
+          set({ isEnabled: false, howl: null });
+        }
+      },
 
-  setMasterVolume: (masterVolume: number) => {
-    const { sounds } = get();
-    const updatedSounds = sounds.map((sound) => {
-      if (sound.howl && sound.isActive) {
-        sound.howl.volume(sound.volume * masterVolume);
-      }
-      return sound;
-    });
-    set({ masterVolume, sounds: updatedSounds });
-  },
+      setVolume: (volume: number) => {
+        const { howl } = get();
+        if (howl) {
+          howl.volume(volume);
+        }
+        set({ volume });
+      },
 
-  playAll: () => {
-    const { sounds, masterVolume } = get();
-    const updatedSounds = sounds.map((sound) => {
-      if (sound.isActive) return sound;
-      if (!Howl) return { ...sound, isActive: true };
-      const howl = new Howl({
-        src: [sound.src],
-        volume: sound.volume * masterVolume,
-        loop: true,
-      });
-      howl.play();
-      return { ...sound, isActive: true, howl };
-    });
-    set({ sounds: updatedSounds, isPlaying: true });
-  },
+      applyPreset: (preset: SoundPreset) => {
+        const state = get();
+        // Stop current
+        if (state.howl) {
+          state.howl.stop();
+          state.howl.unload();
+        }
 
-  stopAll: () => {
-    const { sounds } = get();
-    const updatedSounds = sounds.map((sound) => {
-      if (sound.howl) {
-        sound.howl.stop();
-        sound.howl.unload();
-      }
-      return { ...sound, isActive: false, howl: undefined };
-    });
-    set({ sounds: updatedSounds, isPlaying: false });
-  },
-}));
+        const sound = state.sounds.find((s) => s.id === preset.soundId);
+        if (!sound) {
+          set({ activeSoundId: null, isEnabled: false, howl: null, volume: preset.volume });
+          return;
+        }
+
+        if (!Howl) {
+          set({ activeSoundId: preset.soundId, isEnabled: true, howl: null, volume: preset.volume });
+          return;
+        }
+
+        const howl = new Howl({
+          src: [sound.src],
+          volume: preset.volume,
+          loop: true,
+        });
+        howl.play();
+        set({ activeSoundId: preset.soundId, isEnabled: true, howl, volume: preset.volume });
+      },
+
+      getPreset: (): SoundPreset | null => {
+        const { activeSoundId, volume, isEnabled } = get();
+        if (!isEnabled || !activeSoundId) return null;
+        return { soundId: activeSoundId, volume };
+      },
+    }),
+    {
+      name: "deepr-audio",
+      partialize: (state) => ({
+        sounds: state.sounds,
+        volume: state.volume,
+        activeSoundId: state.activeSoundId,
+      }),
+    }
+  )
+);
