@@ -56,10 +56,15 @@ export function TaskPicker({ selectedIds, onChange }: TaskPickerProps) {
     status: "todo" | "in_progress" | "done";
     priority: "low" | "medium" | "high";
   }) => {
+    console.log("[deepr] handleCreateAndSelect called", data);
+    console.log("[deepr] window.electronAPI:", typeof (window as any).electronAPI);
     const task = await createTask(data);
+    console.log("[deepr] createTask result:", task);
     if (task) {
       onChange([...selectedIds, task.id]);
       setShowCreateForm(false);
+    } else {
+      console.error("[deepr] Task creation returned null — check if electronAPI is available");
     }
   };
 

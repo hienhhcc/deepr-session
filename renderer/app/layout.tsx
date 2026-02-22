@@ -30,7 +30,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname === "/index.html" ? "/" : rawPathname;
 
   return (
     <html lang="en">

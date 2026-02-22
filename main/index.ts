@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "electron";
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, protocol, session } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 
 function createWindow() {
-  const preloadPath = path.join(__dirname, "../main/preload.cjs");
+  const preloadPath = path.join(__dirname, "preload.cjs");
   console.log("[deepr] Preload path:", preloadPath);
   console.log("[deepr] Preload exists:", fs.existsSync(preloadPath));
 
@@ -49,7 +49,7 @@ function createWindow() {
     mainWindow.loadURL("http://localhost:3456");
     mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
-    mainWindow.loadFile(path.join(__dirname, "../renderer/out/index.html"));
+    mainWindow.loadURL("app://./index.html");
   }
 
   // Minimize to tray instead of closing on macOS
@@ -62,6 +62,13 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+
+  // Cmd+Option+I to toggle DevTools in any build
+  mainWindow.webContents.on("before-input-event", (_event, input) => {
+    if (input.meta && input.alt && input.key === "i") {
+      mainWindow?.webContents.toggleDevTools();
+    }
   });
 }
 
@@ -162,7 +169,65 @@ declare module "electron" {
 }
 app.isQuitting = false;
 
+// Must be called before app is ready
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } },
+]);
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript',
+  '.cjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.txt': 'text/plain',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.webp': 'image/webp',
+};
+
 app.whenReady().then(() => {
+  // Serve renderer static files via app:// so client-side navigation
+  // always resolves assets relative to the correct base, regardless of route.
+  const outDir = path.join(app.getAppPath(), 'renderer', 'out');
+  session.defaultSession.protocol.handle('app', (request) => {
+    let { pathname } = new URL(request.url);
+    if (pathname === '/' || pathname === '') pathname = '/index.html';
+
+    const candidates = [
+      path.join(outDir, pathname),
+      path.join(outDir, pathname + '.html'),
+      path.join(outDir, pathname, 'index.html'),
+    ];
+
+    let filePath = path.join(outDir, 'index.html');
+    for (const candidate of candidates) {
+      try {
+        if (fs.statSync(candidate).isFile()) { filePath = candidate; break; }
+      } catch { /* not found, try next */ }
+    }
+
+    const contentType = MIME[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+    const content = fs.readFileSync(filePath);
+    return new Response(content, { headers: { 'content-type': contentType } });
+  });
+
+  // Set dock icon (dev mode — packaged builds use electron-builder icon)
+  if (isDev && process.platform === 'darwin') {
+    const devIconPath = path.join(__dirname, '../../app-icon/icon.icns');
+    if (fs.existsSync(devIconPath)) {
+      app.dock.setIcon(devIconPath);
+    }
+  }
+
   try {
     registerAllHandlers();
     console.log("[deepr] All IPC handlers registered");
