@@ -1,9 +1,29 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 dist-main/
+dist-electron/
 renderer/.next/
 renderer/out/
+
+# Generated type files
 *.js.map
 *.d.ts
+
+# macOS
 .DS_Store
+**/.DS_Store
+
+# Environment
 .env
 .env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
