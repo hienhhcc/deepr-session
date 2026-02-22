@@ -47,6 +47,16 @@ export const DEFAULT_SOUNDS: SoundConfig[] = [
   { id: "white-noise", name: "White Noise", icon: "Radio", src: "/sounds/white-noise.mp3", isDefault: true },
 ];
 
+function createHowl(src: string, volume: number): any {
+  if (!Howl) return null;
+  return new Howl({
+    src: [src],
+    volume,
+    loop: true,
+    html5: true, // Stream audio — starts playing immediately instead of downloading entire file first
+  });
+}
+
 export const useAudioStore = create<AudioState>()(
   persist(
     (set, get) => ({
@@ -82,17 +92,8 @@ export const useAudioStore = create<AudioState>()(
           currentHowl.unload();
         }
 
-        if (!Howl) {
-          set({ activeSoundId: id, isEnabled: true, howl: null });
-          return;
-        }
-
-        const howl = new Howl({
-          src: [sound.src],
-          volume,
-          loop: true,
-        });
-        howl.play();
+        const howl = createHowl(sound.src, volume);
+        if (howl) howl.play();
         set({ activeSoundId: id, isEnabled: true, howl });
       },
 
@@ -111,17 +112,13 @@ export const useAudioStore = create<AudioState>()(
           // If there's a previously selected sound, resume it
           if (activeSoundId) {
             const sound = sounds.find((s) => s.id === activeSoundId);
-            if (sound && Howl) {
+            if (sound) {
               if (currentHowl) {
                 currentHowl.stop();
                 currentHowl.unload();
               }
-              const howl = new Howl({
-                src: [sound.src],
-                volume,
-                loop: true,
-              });
-              howl.play();
+              const howl = createHowl(sound.src, volume);
+              if (howl) howl.play();
               set({ isEnabled: true, howl });
               return;
             }
@@ -158,17 +155,8 @@ export const useAudioStore = create<AudioState>()(
           return;
         }
 
-        if (!Howl) {
-          set({ activeSoundId: preset.soundId, isEnabled: true, howl: null, volume: preset.volume });
-          return;
-        }
-
-        const howl = new Howl({
-          src: [sound.src],
-          volume: preset.volume,
-          loop: true,
-        });
-        howl.play();
+        const howl = createHowl(sound.src, preset.volume);
+        if (howl) howl.play();
         set({ activeSoundId: preset.soundId, isEnabled: true, howl, volume: preset.volume });
       },
 

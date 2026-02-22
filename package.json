@@ -28,12 +28,22 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "app-icon/icon.icns", "to": "icon.icns" }
+      {
+        "from": "app-icon/icon.icns",
+        "to": "icon.icns"
+      }
     ],
     "mac": {
       "icon": "app-icon/icon.icns",
       "category": "public.app-category.productivity",
-      "target": [{ "target": "dir", "arch": ["arm64"] }]
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
     },
     "directories": {
       "output": "dist-electron"

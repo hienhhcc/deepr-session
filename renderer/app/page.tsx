@@ -36,7 +36,7 @@ export default function FocusPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-6">
-      <div className="text-center space-y-8 animate-fade-in">
+      <div className="text-center space-y-8 animate-fade-in w-full max-w-lg">
         {/* Timer */}
         <TimerDisplay />
 

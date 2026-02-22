@@ -216,8 +216,41 @@ app.whenReady().then(() => {
     }
 
     const contentType = MIME[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+    const stat = fs.statSync(filePath);
+    const totalSize = stat.size;
+
+    // Support Range requests (required for HTML5 <audio>/<video> streaming)
+    const rangeHeader = request.headers.get('range');
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+        const chunkSize = end - start + 1;
+        const buf = Buffer.alloc(chunkSize);
+        const fd = fs.openSync(filePath, 'r');
+        fs.readSync(fd, buf, 0, chunkSize, start);
+        fs.closeSync(fd);
+        return new Response(buf, {
+          status: 206,
+          headers: {
+            'content-type': contentType,
+            'content-range': `bytes ${start}-${end}/${totalSize}`,
+            'content-length': String(chunkSize),
+            'accept-ranges': 'bytes',
+          },
+        });
+      }
+    }
+
     const content = fs.readFileSync(filePath);
-    return new Response(content, { headers: { 'content-type': contentType } });
+    return new Response(content, {
+      headers: {
+        'content-type': contentType,
+        'content-length': String(totalSize),
+        'accept-ranges': 'bytes',
+      },
+    });
   });
 
   // Set dock icon (dev mode — packaged builds use electron-builder icon)
