@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   CloudRain,
   TreePine,
@@ -10,6 +11,10 @@ import {
   Volume2,
   VolumeX,
   Music2,
+  Disc3,
+  FileAudio,
+  Play,
+  Pause,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -17,7 +22,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { useAudioStore } from "@/stores/audio.store";
@@ -30,14 +34,25 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Flame,
   Waves,
   Radio,
+  Disc3,
+  FileAudio,
+  Music2,
 };
 
 export function AmbientPlayer() {
   const sounds = useAudioStore((s) => s.sounds);
+  const syncSounds = useAudioStore((s) => s.syncSounds);
+
+  useEffect(() => {
+    syncSounds();
+  }, [syncSounds]);
   const activeSoundId = useAudioStore((s) => s.activeSoundId);
   const volume = useAudioStore((s) => s.volume);
   const isEnabled = useAudioStore((s) => s.isEnabled);
+  const isPaused = useAudioStore((s) => s.isPaused);
   const play = useAudioStore((s) => s.play);
+  const pause = useAudioStore((s) => s.pause);
+  const resume = useAudioStore((s) => s.resume);
   const stop = useAudioStore((s) => s.stop);
   const setEnabled = useAudioStore((s) => s.setEnabled);
   const setVolume = useAudioStore((s) => s.setVolume);
@@ -98,12 +113,44 @@ export function AmbientPlayer() {
         />
       </div>
 
-      {/* Controls: select + volume — shown when enabled */}
+      {/* Controls: play/pause + select + volume — shown when enabled */}
       {isEnabled && (
         <div className="px-4 pb-3.5 pt-0.5 flex items-center gap-3 animate-fade-in">
+          <button
+            onClick={() => (isPaused ? resume() : pause())}
+            className={cn(
+              "h-8 w-8 shrink-0 flex items-center justify-center rounded-full transition-colors",
+              "bg-primary/10 hover:bg-primary/20 text-primary"
+            )}
+          >
+            {isPaused ? (
+              <Play className="h-3.5 w-3.5 ml-0.5" />
+            ) : (
+              <Pause className="h-3.5 w-3.5" />
+            )}
+          </button>
+
           <Select value={activeSoundId ?? ""} onValueChange={handleSoundChange}>
-            <SelectTrigger className="h-8 w-[160px] text-xs bg-background/80">
-              <SelectValue placeholder="Choose sound" />
+            <SelectTrigger className="h-8 w-[160px] text-xs bg-background/80 overflow-hidden">
+              <div className="overflow-hidden w-full text-left">
+                {activeSound ? (
+                  <div className="overflow-hidden whitespace-nowrap">
+                    <span
+                      className={cn(
+                        "inline-block",
+                        !isPaused && "animate-marquee"
+                      )}
+                    >
+                      {activeSound.name}
+                      {!isPaused && (
+                        <span className="inline-block px-6">{activeSound.name}</span>
+                      )}
+                    </span>
+                  </div>
+                ) : (
+                  <span>Choose sound</span>
+                )}
+              </div>
             </SelectTrigger>
             <SelectContent>
               {sounds.map((sound) => {

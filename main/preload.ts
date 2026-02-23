@@ -98,6 +98,7 @@ const electronAPI = {
     listCustom: () => ipcRenderer.invoke(IPC_CHANNELS.AUDIO_LIST_CUSTOM),
     deleteCustom: (id: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.AUDIO_DELETE_CUSTOM, id),
+    scanSounds: () => ipcRenderer.invoke(IPC_CHANNELS.AUDIO_SCAN_SOUNDS),
   },
 
   app: {

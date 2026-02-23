@@ -9,6 +9,7 @@ import { registerTimerHandlers } from "./ipc/timer.ipc.js";
 import { registerBlockerHandlers } from "./ipc/blocker.ipc.js";
 import { registerAnalyticsHandlers } from "./ipc/analytics.ipc.js";
 import { registerTaskHandlers } from "./ipc/tasks.ipc.js";
+import { registerAudioHandlers } from "./ipc/audio.ipc.js";
 import { cleanup as cleanupBlocker, setupSudoless, startupCleanup as blockerStartupCleanup } from "./services/blocker.service.js";
 import { timerService } from "./services/timer.service.js";
 import { IPC_CHANNELS } from "../shared/types/ipc.js";
@@ -154,6 +155,7 @@ function registerAllHandlers() {
   registerBlockerHandlers();
   registerAnalyticsHandlers();
   registerTaskHandlers();
+  registerAudioHandlers();
 
   // App utility handlers
   ipcMain.handle(IPC_CHANNELS.APP_GET_PATH, async (_event, name: string) => {

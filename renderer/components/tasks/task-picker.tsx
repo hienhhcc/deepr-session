@@ -19,13 +19,22 @@ import { cn } from "@/lib/utils";
 interface TaskPickerProps {
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  /** Open the dialog immediately on mount */
+  defaultOpen?: boolean;
+  /** Called when the dialog open state changes */
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function TaskPicker({ selectedIds, onChange }: TaskPickerProps) {
+export function TaskPicker({ selectedIds, onChange, defaultOpen, onOpenChange }: TaskPickerProps) {
   const { tasks, fetchTasks, createTask } = useTaskStore();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen ?? false);
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
+
+  const handleOpenChange = (value: boolean) => {
+    setOpen(value);
+    onOpenChange?.(value);
+  };
 
   useEffect(() => {
     fetchTasks();
@@ -56,54 +65,56 @@ export function TaskPicker({ selectedIds, onChange }: TaskPickerProps) {
     status: "todo" | "in_progress" | "done";
     priority: "low" | "medium" | "high";
   }) => {
-    console.log("[deepr] handleCreateAndSelect called", data);
-    console.log("[deepr] window.electronAPI:", typeof (window as any).electronAPI);
     const task = await createTask(data);
-    console.log("[deepr] createTask result:", task);
     if (task) {
       onChange([...selectedIds, task.id]);
       setShowCreateForm(false);
-    } else {
-      console.error("[deepr] Task creation returned null — check if electronAPI is available");
     }
   };
 
+  // When used as a controlled dialog (defaultOpen), don't render inline UI
+  const isControlled = defaultOpen !== undefined;
+
   return (
     <div className="space-y-2">
-      {/* Selected task badges */}
-      {selectedTasks.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {selectedTasks.map((task) => (
-            <Badge
-              key={task.id}
-              variant="secondary"
-              className="gap-1 pr-1 text-xs"
-            >
-              {task.name}
-              <button
-                type="button"
-                onClick={() => handleRemove(task.id)}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
-        </div>
+      {/* Inline UI: badges + Add button (hidden when controlled) */}
+      {!isControlled && (
+        <>
+          {selectedTasks.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedTasks.map((task) => (
+                <Badge
+                  key={task.id}
+                  variant="secondary"
+                  className="gap-1 pr-1 text-xs"
+                >
+                  {task.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(task.id)}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => handleOpenChange(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Task
+          </Button>
+        </>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-1.5 text-xs"
-        onClick={() => setOpen(true)}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Add Task
-      </Button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Select Tasks</DialogTitle>
@@ -180,7 +191,7 @@ export function TaskPicker({ selectedIds, onChange }: TaskPickerProps) {
               </Button>
 
               <div className="flex justify-end pt-1">
-                <Button size="sm" onClick={() => setOpen(false)}>
+                <Button size="sm" onClick={() => handleOpenChange(false)}>
                   Done
                 </Button>
               </div>

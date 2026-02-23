@@ -25,12 +25,17 @@ interface AudioState {
   activeSoundId: string | null;
   volume: number;
   isEnabled: boolean;
+  isPaused: boolean;
   howl: any | null;
   // Actions
   setSounds: (sounds: SoundConfig[]) => void;
   addSound: (sound: SoundConfig) => void;
   removeSound: (id: string) => void;
+  renameSound: (id: string, name: string) => void;
+  syncSounds: () => Promise<void>;
   play: (id: string) => void;
+  pause: () => void;
+  resume: () => void;
   stop: () => void;
   setEnabled: (enabled: boolean) => void;
   setVolume: (volume: number) => void;
@@ -38,14 +43,13 @@ interface AudioState {
   getPreset: () => SoundPreset | null;
 }
 
-export const DEFAULT_SOUNDS: SoundConfig[] = [
-  { id: "rain", name: "Rain", icon: "CloudRain", src: "/sounds/rain.mp3", isDefault: true },
-  { id: "forest", name: "Forest", icon: "TreePine", src: "/sounds/forest.mp3", isDefault: true },
-  { id: "cafe", name: "Cafe", icon: "Coffee", src: "/sounds/cafe.mp3", isDefault: true },
-  { id: "fireplace", name: "Fireplace", icon: "Flame", src: "/sounds/fireplace.mp3", isDefault: true },
-  { id: "ocean", name: "Ocean", icon: "Waves", src: "/sounds/ocean.mp3", isDefault: true },
-  { id: "white-noise", name: "White Noise", icon: "Radio", src: "/sounds/white-noise.mp3", isDefault: true },
-];
+/** Convert a filename like "work-music-for-coding-flow.mp3" to "Work Music For Coding Flow" */
+function filenameToName(filename: string): string {
+  return filename
+    .replace(/\.[^.]+$/, "") // strip extension
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function createHowl(src: string, volume: number): any {
   if (!Howl) return null;
@@ -60,10 +64,11 @@ function createHowl(src: string, volume: number): any {
 export const useAudioStore = create<AudioState>()(
   persist(
     (set, get) => ({
-      sounds: DEFAULT_SOUNDS,
+      sounds: [],
       activeSoundId: null,
       volume: 0.7,
       isEnabled: false,
+      isPaused: false,
       howl: null,
 
       setSounds: (sounds: SoundConfig[]) => set({ sounds }),
@@ -81,6 +86,59 @@ export const useAudioStore = create<AudioState>()(
         }));
       },
 
+      renameSound: (id: string, name: string) => {
+        set((state) => ({
+          sounds: state.sounds.map((s) =>
+            s.id === id ? { ...s, name } : s
+          ),
+        }));
+      },
+
+      syncSounds: async () => {
+        if (typeof window === "undefined") return;
+        const api = (window as any).electronAPI;
+        if (!api?.audio?.scanSounds) return;
+
+        try {
+          const files: { filename: string; src: string }[] = await api.audio.scanSounds();
+          const { sounds: current } = get();
+
+          // Index existing sounds by src for fast lookup
+          const existingBySrc = new Map(current.map((s) => [s.src, s]));
+          const fileSrcs = new Set(files.map((f) => f.src));
+
+          const merged: SoundConfig[] = [];
+
+          // Add all sounds found on disk, preserving user customizations
+          for (const file of files) {
+            const existing = existingBySrc.get(file.src);
+            if (existing) {
+              merged.push(existing);
+            } else {
+              const id = file.filename.replace(/\.[^.]+$/, "").replace(/\s+/g, "-").toLowerCase();
+              merged.push({
+                id,
+                name: filenameToName(file.filename),
+                icon: "Music2",
+                src: file.src,
+                isDefault: true,
+              });
+            }
+          }
+
+          // Keep non-default sounds that aren't from the /sounds folder (custom paths)
+          for (const sound of current) {
+            if (!fileSrcs.has(sound.src) && !sound.isDefault) {
+              merged.push(sound);
+            }
+          }
+
+          set({ sounds: merged });
+        } catch (err) {
+          console.error("[audio] Failed to sync sounds:", err);
+        }
+      },
+
       play: (id: string) => {
         const { sounds, volume, howl: currentHowl } = get();
         const sound = sounds.find((s) => s.id === id);
@@ -94,7 +152,19 @@ export const useAudioStore = create<AudioState>()(
 
         const howl = createHowl(sound.src, volume);
         if (howl) howl.play();
-        set({ activeSoundId: id, isEnabled: true, howl });
+        set({ activeSoundId: id, isEnabled: true, isPaused: false, howl });
+      },
+
+      pause: () => {
+        const { howl } = get();
+        if (howl) howl.pause();
+        set({ isPaused: true });
+      },
+
+      resume: () => {
+        const { howl } = get();
+        if (howl) howl.play();
+        set({ isPaused: false });
       },
 
       stop: () => {
@@ -103,7 +173,7 @@ export const useAudioStore = create<AudioState>()(
           howl.stop();
           howl.unload();
         }
-        set({ activeSoundId: null, isEnabled: false, howl: null });
+        set({ activeSoundId: null, isEnabled: false, isPaused: false, howl: null });
       },
 
       setEnabled: (enabled: boolean) => {
@@ -119,7 +189,7 @@ export const useAudioStore = create<AudioState>()(
               }
               const howl = createHowl(sound.src, volume);
               if (howl) howl.play();
-              set({ isEnabled: true, howl });
+              set({ isEnabled: true, isPaused: false, howl });
               return;
             }
           }
@@ -129,7 +199,7 @@ export const useAudioStore = create<AudioState>()(
             currentHowl.stop();
             currentHowl.unload();
           }
-          set({ isEnabled: false, howl: null });
+          set({ isEnabled: false, isPaused: false, howl: null });
         }
       },
 
@@ -157,7 +227,7 @@ export const useAudioStore = create<AudioState>()(
 
         const howl = createHowl(sound.src, preset.volume);
         if (howl) howl.play();
-        set({ activeSoundId: preset.soundId, isEnabled: true, howl, volume: preset.volume });
+        set({ activeSoundId: preset.soundId, isEnabled: true, isPaused: false, howl, volume: preset.volume });
       },
 
       getPreset: (): SoundPreset | null => {

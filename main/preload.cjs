@@ -70,6 +70,7 @@ const electronAPI = {
     import: (filePath) => ipcRenderer.invoke("audio:import", filePath),
     listCustom: () => ipcRenderer.invoke("audio:list-custom"),
     deleteCustom: (id) => ipcRenderer.invoke("audio:delete-custom", id),
+    scanSounds: () => ipcRenderer.invoke("audio:scan-sounds"),
   },
 
   app: {
