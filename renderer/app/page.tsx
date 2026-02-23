@@ -15,7 +15,24 @@ import {
   ChevronDown,
   Trash2,
   X,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { SessionSetup } from "@/components/timer/session-setup";
 import { TimerDisplay } from "@/components/timer/timer-display";
@@ -24,7 +41,7 @@ import { TaskPicker } from "@/components/tasks/task-picker";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { useTimer } from "@/hooks/useTimer";
 import { useSessionStore } from "@/stores/session.store";
-import { useTaskStore, type Task } from "@/stores/task.store";
+import { useTaskStore, type Task, type TaskPriority } from "@/stores/task.store";
 import { useAudioStore } from "@/stores/audio.store";
 import { formatTime, cn } from "@/lib/utils";
 
@@ -112,7 +129,9 @@ function SessionTaskManager() {
 
   if (!activeSession) return null;
 
-  const sessionTasks = tasks.filter((t) => selectedIds.includes(t.id));
+  const sessionTasks = selectedIds
+    .map((id) => tasks.find((t) => t.id === id))
+    .filter((t): t is Task => t != null);
 
   const handleToggleComplete = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
@@ -145,6 +164,30 @@ function SessionTaskManager() {
     updateSessionTasks(ids);
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragStart = () => {
+    document.body.classList.add("dragging");
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    document.body.classList.remove("dragging");
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = selectedIds.indexOf(active.id as string);
+    const newIndex = selectedIds.indexOf(over.id as string);
+    const newIds = arrayMove(selectedIds, oldIndex, newIndex);
+    setSelectedIds(newIds);
+    updateSessionTasks(newIds);
+  };
+
+  const handleDragCancel = () => {
+    document.body.classList.remove("dragging");
+  };
+
   return (
     <div className="max-w-md w-full mx-auto text-left">
       <div className="flex items-center justify-between mb-3">
@@ -167,146 +210,28 @@ function SessionTaskManager() {
       </div>
 
       {sessionTasks.length > 0 ? (
-        <div className="space-y-3">
-          {sessionTasks.map((task) => {
-            const isDone = task.status === "done";
-            const isExpanded = expandedId === task.id;
-            const subtaskCount = task.subtasks?.length ?? 0;
-            const doneCount = task.subtasks?.filter((s) => s.done).length ?? 0;
-
-            return (
-              <div key={task.id} className={cn("rounded-xl border border-border/60 bg-card/40 transition-all", isExpanded && "bg-muted/20")}>
-                {/* Main row */}
-                <div className="flex items-center gap-3 px-3 py-2.5 group">
-                  {/* Checkbox circle */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleComplete(task.id)}
-                    className="shrink-0 focus:outline-none"
-                  >
-                    <div
-                      className={cn(
-                        "h-[18px] w-[18px] rounded-full border-2 flex items-center justify-center transition-all",
-                        isDone
-                          ? "bg-primary border-primary"
-                          : "border-muted-foreground/30 hover:border-primary/60"
-                      )}
-                    >
-                      {isDone && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
-                    </div>
-                  </button>
-
-                  {isExpanded ? (
-                    /* Inline editable name when expanded */
-                    <InlineEdit
-                      value={task.name}
-                      onSave={(name) => updateTask({ id: task.id, name })}
-                      className="flex-1 min-w-0 text-sm"
-                    />
-                  ) : (
-                    /* Static name — click to expand */
-                    <button
-                      type="button"
-                      className="flex-1 min-w-0 text-left"
-                      onClick={() => setExpandedId(task.id)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "text-sm truncate transition-all",
-                            isDone ? "text-muted-foreground/50 line-through" : "text-foreground"
-                          )}
-                        >
-                          {task.name}
-                        </span>
-                        {subtaskCount > 0 && (
-                          <span className="text-[10px] text-muted-foreground/50 shrink-0">
-                            {doneCount}/{subtaskCount}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  )}
-
-                  {/* Priority (clickable to cycle when expanded) + expand arrow */}
-                  {isExpanded ? (
-                    <button
-                      type="button"
-                      onClick={() => handleCyclePriority(task)}
-                      title="Click to change priority"
-                      className="shrink-0"
-                    >
-                      <PriorityBadge priority={task.priority} className="cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/30 transition-all" />
-                    </button>
-                  ) : (
-                    <PriorityBadge priority={task.priority} className="shrink-0" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(isExpanded ? null : task.id)}
-                    className="shrink-0 focus:outline-none"
-                  >
-                    <ChevronDown
-                      className={cn(
-                        "h-3.5 w-3.5 text-muted-foreground/40 transition-transform",
-                        isExpanded && "rotate-180"
-                      )}
-                    />
-                  </button>
-                </div>
-
-                {/* Expanded detail panel */}
-                {isExpanded && (
-                  <div className="px-3 pb-4 animate-fade-in">
-                    <div className="ml-[30px] space-y-4 border-t border-border/40 pt-3.5">
-                      {/* Editable description */}
-                      <InlineEdit
-                        value={task.description ?? ""}
-                        onSave={(desc) => updateTask({ id: task.id, description: desc || undefined })}
-                        placeholder="description"
-                        className="text-xs text-muted-foreground/70"
-                        multiline
-                      />
-
-                      {/* Subtasks with editable names */}
-                      <EditableSubtaskList
-                        subtasks={task.subtasks ?? []}
-                        onToggle={(id, done) => updateSubtask(id, { done })}
-                        onRename={(id, name) => updateSubtask(id, { name })}
-                        onDelete={deleteSubtask}
-                        onCreate={(name) => createSubtask(task.id, name)}
-                      />
-
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-1 pt-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => handleRemoveFromSession(task.id)}
-                        >
-                          <X className="h-3 w-3" />
-                          Remove
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteTask(task.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+          <SortableContext items={selectedIds} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {sessionTasks.map((task) => (
+                <SortableTaskCard
+                  key={task.id}
+                  task={task}
+                  isExpanded={expandedId === task.id}
+                  onToggleExpand={() => setExpandedId(expandedId === task.id ? null : task.id)}
+                  onToggleComplete={() => handleToggleComplete(task.id)}
+                  onCyclePriority={() => handleCyclePriority(task)}
+                  onRemove={() => handleRemoveFromSession(task.id)}
+                  onDelete={() => handleDeleteTask(task.id)}
+                  updateTask={updateTask}
+                  updateSubtask={updateSubtask}
+                  deleteSubtask={deleteSubtask}
+                  createSubtask={createSubtask}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       ) : (
         <p className="text-sm text-muted-foreground/50 text-center py-3">
           No tasks yet
@@ -321,6 +246,186 @@ function SessionTaskManager() {
           defaultOpen
           onOpenChange={(open) => { if (!open) setShowPicker(false); }}
         />
+      )}
+    </div>
+  );
+}
+
+function SortableTaskCard({
+  task,
+  isExpanded,
+  onToggleExpand,
+  onToggleComplete,
+  onCyclePriority,
+  onRemove,
+  onDelete,
+  updateTask,
+  updateSubtask,
+  deleteSubtask,
+  createSubtask,
+}: {
+  task: Task;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onToggleComplete: () => void;
+  onCyclePriority: () => void;
+  onRemove: () => void;
+  onDelete: () => void;
+  updateTask: (data: { id: string; name?: string; description?: string; priority?: TaskPriority }) => void;
+  updateSubtask: (id: string, data: { done?: boolean; name?: string }) => void;
+  deleteSubtask: (id: string) => void;
+  createSubtask: (taskId: string, name: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const isDone = task.status === "done";
+  const subtaskCount = task.subtasks?.length ?? 0;
+  const doneCount = task.subtasks?.filter((s) => s.done).length ?? 0;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-xl border border-border/60 bg-card/40 transition-all",
+        isExpanded && "bg-muted/20",
+        isDragging && "opacity-50 shadow-lg"
+      )}
+    >
+      {/* Main row */}
+      <div className="flex items-center gap-2 px-3 py-2.5 group">
+        {/* Drag handle */}
+        <button
+          type="button"
+          className="shrink-0 touch-none text-muted-foreground/60 hover:text-muted-foreground transition-colors cursor-grab"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        {/* Checkbox circle */}
+        <button
+          type="button"
+          onClick={onToggleComplete}
+          className="shrink-0 focus:outline-none"
+        >
+          <div
+            className={cn(
+              "h-[18px] w-[18px] rounded-full border-2 flex items-center justify-center transition-all",
+              isDone
+                ? "bg-primary border-primary"
+                : "border-muted-foreground/30 hover:border-primary/60"
+            )}
+          >
+            {isDone && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
+          </div>
+        </button>
+
+        {isExpanded ? (
+          <InlineEdit
+            value={task.name}
+            onSave={(name) => updateTask({ id: task.id, name })}
+            className="flex-1 min-w-0 text-sm"
+          />
+        ) : (
+          <button
+            type="button"
+            className="flex-1 min-w-0 text-left"
+            onClick={onToggleExpand}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "text-sm truncate transition-all",
+                  isDone ? "text-muted-foreground/50 line-through" : "text-foreground"
+                )}
+              >
+                {task.name}
+              </span>
+              {subtaskCount > 0 && (
+                <span className="text-[10px] text-muted-foreground/50 shrink-0">
+                  {doneCount}/{subtaskCount}
+                </span>
+              )}
+            </div>
+          </button>
+        )}
+
+        {isExpanded ? (
+          <button
+            type="button"
+            onClick={onCyclePriority}
+            title="Click to change priority"
+            className="shrink-0"
+          >
+            <PriorityBadge priority={task.priority} className="cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/30 transition-all" />
+          </button>
+        ) : (
+          <PriorityBadge priority={task.priority} className="shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="shrink-0 focus:outline-none"
+        >
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 text-muted-foreground/40 transition-transform",
+              isExpanded && "rotate-180"
+            )}
+          />
+        </button>
+      </div>
+
+      {/* Expanded detail panel */}
+      {isExpanded && (
+        <div className="px-3 pb-4 animate-fade-in">
+          <div className="ml-[42px] space-y-4 border-t border-border/40 pt-3.5">
+            <EditableSubtaskList
+              subtasks={task.subtasks ?? []}
+              onToggle={(id, done) => updateSubtask(id, { done })}
+              onRename={(id, name) => updateSubtask(id, { name })}
+              onDelete={deleteSubtask}
+              onCreate={(name) => createSubtask(task.id, name)}
+            />
+
+            <div className="flex items-center gap-1 pt-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={onRemove}
+              >
+                <X className="h-3 w-3" />
+                Remove
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

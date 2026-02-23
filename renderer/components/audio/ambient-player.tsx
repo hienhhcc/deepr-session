@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   CloudRain,
   TreePine,
@@ -39,6 +39,13 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Music2,
 };
 
+const MARQUEE_STYLE_ID = "marquee-keyframes";
+const MARQUEE_CSS = `
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}`;
+
 export function AmbientPlayer() {
   const sounds = useAudioStore((s) => s.sounds);
   const syncSounds = useAudioStore((s) => s.syncSounds);
@@ -46,6 +53,15 @@ export function AmbientPlayer() {
   useEffect(() => {
     syncSounds();
   }, [syncSounds]);
+
+  // Inject marquee keyframes into <head> once
+  useEffect(() => {
+    if (document.getElementById(MARQUEE_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = MARQUEE_STYLE_ID;
+    style.textContent = MARQUEE_CSS;
+    document.head.appendChild(style);
+  }, []);
   const activeSoundId = useAudioStore((s) => s.activeSoundId);
   const volume = useAudioStore((s) => s.volume);
   const isEnabled = useAudioStore((s) => s.isEnabled);
@@ -58,6 +74,23 @@ export function AmbientPlayer() {
   const setVolume = useAudioStore((s) => s.setVolume);
 
   const activeSound = sounds.find((s) => s.id === activeSoundId);
+
+  // Marquee: only scroll if the text overflows the container
+  const marqueeContainerRef = useRef<HTMLDivElement>(null);
+  const marqueeTextRef = useRef<HTMLSpanElement>(null);
+  const [needsMarquee, setNeedsMarquee] = useState(false);
+
+  const checkOverflow = useCallback(() => {
+    const container = marqueeContainerRef.current;
+    const text = marqueeTextRef.current;
+    if (container && text) {
+      setNeedsMarquee(text.scrollWidth > container.clientWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+  }, [activeSound?.name, isEnabled, checkOverflow]);
 
   const handleToggle = (checked: boolean) => {
     if (checked) {
@@ -131,22 +164,34 @@ export function AmbientPlayer() {
           </button>
 
           <Select value={activeSoundId ?? ""} onValueChange={handleSoundChange}>
-            <SelectTrigger className="h-8 w-[160px] text-xs bg-background/80 overflow-hidden">
-              <div className="overflow-hidden w-full text-left">
+            <SelectTrigger className="h-8 w-[160px] text-xs bg-background/80 [&>span]:!line-clamp-none [&>span]:!overflow-hidden">
+              <div
+                ref={marqueeContainerRef}
+                className="overflow-hidden w-full text-left relative"
+              >
+                {/* Hidden span for measuring text width — always present */}
+                <span
+                  ref={marqueeTextRef}
+                  className="invisible absolute top-0 left-0 whitespace-nowrap"
+                  aria-hidden
+                >
+                  {activeSound?.name ?? "Choose sound"}
+                </span>
+
                 {activeSound ? (
-                  <div className="overflow-hidden whitespace-nowrap">
-                    <span
-                      className={cn(
-                        "inline-block",
-                        !isPaused && "animate-marquee"
-                      )}
+                  needsMarquee && !isPaused ? (
+                    <div
+                      className="inline-flex whitespace-nowrap"
+                      style={{ width: "max-content", animation: "marquee-scroll 8s linear infinite" }}
                     >
+                      <span>{activeSound.name}</span>
+                      <span className="ml-10">{activeSound.name}</span>
+                    </div>
+                  ) : (
+                    <span className="block truncate">
                       {activeSound.name}
-                      {!isPaused && (
-                        <span className="inline-block px-6">{activeSound.name}</span>
-                      )}
                     </span>
-                  </div>
+                  )
                 ) : (
                   <span>Choose sound</span>
                 )}

@@ -48,6 +48,7 @@
   --color-bark: oklch(0.4500 0.0400 60.0000);
   --color-amber-warm: oklch(0.7500 0.1200 75.0000);
   --color-earth: oklch(0.5500 0.0600 60.0000);
+
 }
 
 .dark {
@@ -136,19 +137,6 @@
   100% { background-position: 200% 0; }
 }
 
-@keyframes marquee-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.animate-marquee {
-  animation: marquee-scroll 8s linear infinite;
-}
-
-.animate-marquee-paused {
-  animation-play-state: paused;
-}
-
 .animate-fade-in-up {
   animation: fade-in-up 0.5s ease-out both;
 }
@@ -216,6 +204,12 @@
     oklch(0.9500 0.0200 120.0000) 50%,
     oklch(0.9600 0.0150 100.0000) 100%
   );
+}
+
+/* Force grabbing cursor on all elements during drag */
+body.dragging,
+body.dragging * {
+  cursor: grabbing !important;
 }
 
 /* Organic border style */

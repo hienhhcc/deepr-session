@@ -66,7 +66,7 @@ export const useAudioStore = create<AudioState>()(
     (set, get) => ({
       sounds: [],
       activeSoundId: null,
-      volume: 0.7,
+      volume: 0.2,
       isEnabled: false,
       isPaused: false,
       howl: null,
@@ -88,9 +88,7 @@ export const useAudioStore = create<AudioState>()(
 
       renameSound: (id: string, name: string) => {
         set((state) => ({
-          sounds: state.sounds.map((s) =>
-            s.id === id ? { ...s, name } : s
-          ),
+          sounds: state.sounds.map((s) => (s.id === id ? { ...s, name } : s)),
         }));
       },
 
@@ -100,7 +98,8 @@ export const useAudioStore = create<AudioState>()(
         if (!api?.audio?.scanSounds) return;
 
         try {
-          const files: { filename: string; src: string }[] = await api.audio.scanSounds();
+          const files: { filename: string; src: string }[] =
+            await api.audio.scanSounds();
           const { sounds: current } = get();
 
           // Index existing sounds by src for fast lookup
@@ -115,7 +114,10 @@ export const useAudioStore = create<AudioState>()(
             if (existing) {
               merged.push(existing);
             } else {
-              const id = file.filename.replace(/\.[^.]+$/, "").replace(/\s+/g, "-").toLowerCase();
+              const id = file.filename
+                .replace(/\.[^.]+$/, "")
+                .replace(/\s+/g, "-")
+                .toLowerCase();
               merged.push({
                 id,
                 name: filenameToName(file.filename),
@@ -173,7 +175,12 @@ export const useAudioStore = create<AudioState>()(
           howl.stop();
           howl.unload();
         }
-        set({ activeSoundId: null, isEnabled: false, isPaused: false, howl: null });
+        set({
+          activeSoundId: null,
+          isEnabled: false,
+          isPaused: false,
+          howl: null,
+        });
       },
 
       setEnabled: (enabled: boolean) => {
@@ -221,13 +228,24 @@ export const useAudioStore = create<AudioState>()(
 
         const sound = state.sounds.find((s) => s.id === preset.soundId);
         if (!sound) {
-          set({ activeSoundId: null, isEnabled: false, howl: null, volume: preset.volume });
+          set({
+            activeSoundId: null,
+            isEnabled: false,
+            howl: null,
+            volume: preset.volume,
+          });
           return;
         }
 
         const howl = createHowl(sound.src, preset.volume);
         if (howl) howl.play();
-        set({ activeSoundId: preset.soundId, isEnabled: true, isPaused: false, howl, volume: preset.volume });
+        set({
+          activeSoundId: preset.soundId,
+          isEnabled: true,
+          isPaused: false,
+          howl,
+          volume: preset.volume,
+        });
       },
 
       getPreset: (): SoundPreset | null => {
@@ -243,6 +261,6 @@ export const useAudioStore = create<AudioState>()(
         volume: state.volume,
         activeSoundId: state.activeSoundId,
       }),
-    }
-  )
+    },
+  ),
 );

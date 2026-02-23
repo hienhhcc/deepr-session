@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -34,7 +33,6 @@ interface TaskFormProps {
 
 export function TaskForm({ task, onSubmit, onCancel }: TaskFormProps) {
   const [name, setName] = useState(task?.name || "");
-  const [description, setDescription] = useState(task?.description || "");
   const [status, setStatus] = useState<TaskStatus>(task?.status || "todo");
   const [priority, setPriority] = useState<TaskPriority>(task?.priority || "medium");
 
@@ -43,7 +41,6 @@ export function TaskForm({ task, onSubmit, onCancel }: TaskFormProps) {
     if (!name.trim()) return;
     onSubmit({
       name: name.trim(),
-      description: description.trim() || undefined,
       status,
       priority,
     });
@@ -62,19 +59,6 @@ export function TaskForm({ task, onSubmit, onCancel }: TaskFormProps) {
           onChange={(e) => setName(e.target.value)}
           className="h-10"
           autoFocus
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="task-desc" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Description
-        </Label>
-        <Textarea
-          id="task-desc"
-          placeholder="Optional description..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
         />
       </div>
 

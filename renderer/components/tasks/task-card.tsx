@@ -84,12 +84,6 @@ export function TaskCard({
                 <PriorityBadge priority={task.priority} className="shrink-0" />
               </div>
 
-              {task.description && (
-                <p className="text-xs text-muted-foreground line-clamp-1 mb-1">
-                  {task.description}
-                </p>
-              )}
-
               {totalCount > 0 && (
                 <p className="text-xs text-muted-foreground/70">
                   {doneCount}/{totalCount} subtasks
@@ -141,12 +135,6 @@ export function TaskCard({
             className="animate-fade-in-up mt-4 pt-3 border-t border-border"
             onClick={(e) => e.stopPropagation()}
           >
-            {task.description && (
-              <p className="text-sm text-foreground/80 mb-3 whitespace-pre-wrap">
-                {task.description}
-              </p>
-            )}
-
             <SubtaskList
               subtasks={task.subtasks}
               onToggle={onToggleSubtask}

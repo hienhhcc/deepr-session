@@ -120,7 +120,7 @@ export function ProfileForm({ profile, open, onOpenChange }: ProfileFormProps) {
     setSaving(true);
     try {
       const preset = useAudioStore.getState().getPreset();
-      const soundPreset = preset ? JSON.stringify(preset) : undefined;
+      const soundPreset = preset ? JSON.stringify(preset) : null;
 
       if (profile) {
         await updateProfile({

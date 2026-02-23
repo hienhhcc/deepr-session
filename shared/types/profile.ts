@@ -22,7 +22,7 @@ export interface CreateProfileInput {
   sessionsBeforeLongBreak?: number;
   blockedDomains?: string[];
   blockedApps?: string[];
-  soundPreset?: string;
+  soundPreset?: string | null;
 }
 
 export interface UpdateProfileInput {
@@ -35,5 +35,5 @@ export interface UpdateProfileInput {
   sessionsBeforeLongBreak?: number;
   blockedDomains?: string[];
   blockedApps?: string[];
-  soundPreset?: string;
+  soundPreset?: string | null;
 }

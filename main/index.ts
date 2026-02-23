@@ -65,10 +65,14 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // Cmd+Option+I to toggle DevTools in any build
+  // Dev keyboard shortcuts
   mainWindow.webContents.on("before-input-event", (_event, input) => {
     if (input.meta && input.alt && input.key === "i") {
       mainWindow?.webContents.toggleDevTools();
+    }
+    // Cmd+R to reload in dev
+    if (isDev && input.meta && !input.alt && !input.shift && input.key === "r") {
+      mainWindow?.webContents.reload();
     }
   });
 }
