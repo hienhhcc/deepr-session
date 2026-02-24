@@ -57,6 +57,12 @@ export const IPC_CHANNELS = {
   AUDIO_DELETE_CUSTOM: "audio:delete-custom",
   AUDIO_SCAN_SOUNDS: "audio:scan-sounds",
 
+  // Playlist channels
+  PLAYLIST_LIST: "playlist:list",
+  PLAYLIST_CREATE: "playlist:create",
+  PLAYLIST_UPDATE: "playlist:update",
+  PLAYLIST_DELETE: "playlist:delete",
+
   // App channels
   APP_GET_PATH: "app:get-path",
 } as const;

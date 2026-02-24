@@ -72,6 +72,7 @@ function runMigrations(database: Database.Database) {
     const inlineMigrations: [string, (db: Database.Database) => void][] = [
       ["001_initial", applyInitialMigration],
       ["002_tasks", applyTasksMigration],
+      ["003_playlists", applyPlaylistsMigration],
     ];
 
     for (const [name, applyFn] of inlineMigrations) {
@@ -216,6 +217,26 @@ function applyTasksMigration(database: Database.Database) {
     JOIN tasks t ON t.name = s.task
       AND t.created_at = s.started_at
     WHERE s.task IS NOT NULL AND s.task != '';
+  `);
+}
+
+function applyPlaylistsMigration(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS playlists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS playlist_items (
+      playlist_id TEXT NOT NULL,
+      sound_id TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (playlist_id, sound_id),
+      FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist ON playlist_items(playlist_id);
   `);
 }
 

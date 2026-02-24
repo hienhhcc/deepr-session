@@ -15,6 +15,14 @@ import {
   Disc3,
   FileAudio,
   FolderOpen,
+  Loader2,
+  ListMusic,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  X,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +33,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useAudioStore, type SoundConfig } from "@/stores/audio.store";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
+import { useAudioStore, type SoundConfig, type Playlist } from "@/stores/audio.store";
 import { cn } from "@/lib/utils";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -45,16 +59,24 @@ export default function SoundsPage() {
   const removeSound = useAudioStore((s) => s.removeSound);
   const renameSound = useAudioStore((s) => s.renameSound);
   const syncSounds = useAudioStore((s) => s.syncSounds);
+  const playlists = useAudioStore((s) => s.playlists);
+  const fetchPlaylists = useAudioStore((s) => s.fetchPlaylists);
+  const createPlaylist = useAudioStore((s) => s.createPlaylist);
+  const updatePlaylist = useAudioStore((s) => s.updatePlaylist);
+  const removePlaylist = useAudioStore((s) => s.removePlaylist);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deletePlaylistConfirm, setDeletePlaylistConfirm] = useState<string | null>(null);
+  const [rescanning, setRescanning] = useState(false);
 
   // Preview playback
   const [previewId, setPreviewId] = useState<string | null>(null);
   const previewHowlRef = useRef<any>(null);
 
-  // Sync sounds from filesystem on mount
+  // Sync sounds and playlists from filesystem on mount
   useEffect(() => {
     syncSounds();
-  }, [syncSounds]);
+    fetchPlaylists();
+  }, [syncSounds, fetchPlaylists]);
 
   const handlePreview = (sound: SoundConfig) => {
     // Stop current preview
@@ -115,12 +137,63 @@ export default function SoundsPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => syncSounds()}
+          disabled={rescanning}
+          onClick={async () => {
+            setRescanning(true);
+            await syncSounds();
+            await fetchPlaylists();
+            setRescanning(false);
+          }}
           className="gap-1.5"
         >
-          <FolderOpen className="h-3.5 w-3.5" />
-          Rescan
+          {rescanning ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <FolderOpen className="h-3.5 w-3.5" />
+          )}
+          {rescanning ? "Scanning..." : "Rescan"}
         </Button>
+      </div>
+
+      {/* Playlists section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ListMusic className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Playlists</h2>
+            <span className="text-xs text-muted-foreground">({playlists.length})</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => createPlaylist("New Playlist", [])}
+            className="gap-1.5 h-7 text-xs"
+          >
+            <Plus className="h-3 w-3" />
+            New Playlist
+          </Button>
+        </div>
+        {playlists.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border/60 bg-card/40 py-6 flex flex-col items-center justify-center text-center">
+            <ListMusic className="h-5 w-5 text-muted-foreground/40 mb-2" />
+            <p className="text-xs text-muted-foreground/60">
+              Create a playlist to group sounds together
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {playlists.map((playlist) => (
+              <PlaylistRow
+                key={playlist.id}
+                playlist={playlist}
+                sounds={sounds}
+                onRename={(name) => updatePlaylist(playlist.id, { name })}
+                onUpdateSounds={(soundIds) => updatePlaylist(playlist.id, { soundIds })}
+                onDelete={() => setDeletePlaylistConfirm(playlist.id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Sounds grid */}
@@ -150,7 +223,7 @@ export default function SoundsPage() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
+      {/* Delete Sound Confirmation */}
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -168,6 +241,34 @@ export default function SoundsPage() {
               onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
             >
               Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Playlist Confirmation */}
+      <Dialog open={!!deletePlaylistConfirm} onOpenChange={() => setDeletePlaylistConfirm(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Playlist</DialogTitle>
+            <DialogDescription>
+              This playlist will be permanently deleted. Your sounds will not be affected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletePlaylistConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deletePlaylistConfirm) {
+                  removePlaylist(deletePlaylistConfirm);
+                  setDeletePlaylistConfirm(null);
+                }
+              }}
+            >
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -278,6 +379,177 @@ function SoundRow({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function PlaylistRow({
+  playlist,
+  sounds,
+  onRename,
+  onUpdateSounds,
+  onDelete,
+}: {
+  playlist: Playlist;
+  sounds: SoundConfig[];
+  onRename: (name: string) => void;
+  onUpdateSounds: (soundIds: string[]) => void;
+  onDelete: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [draft, setDraft] = useState(playlist.name);
+
+  useEffect(() => { setDraft(playlist.name); }, [playlist.name]);
+
+  const commitRename = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== playlist.name) {
+      onRename(trimmed);
+    } else {
+      setDraft(playlist.name);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      (e.target as HTMLElement).blur();
+    }
+    if (e.key === "Escape") {
+      setDraft(playlist.name);
+      (e.target as HTMLElement).blur();
+    }
+  };
+
+  const handleToggleSound = (soundId: string) => {
+    if (playlist.soundIds.includes(soundId)) {
+      onUpdateSounds(playlist.soundIds.filter((id) => id !== soundId));
+    } else {
+      onUpdateSounds([...playlist.soundIds, soundId]);
+    }
+  };
+
+  const handleRemoveSound = (soundId: string) => {
+    onUpdateSounds(playlist.soundIds.filter((id) => id !== soundId));
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const ids = [...playlist.soundIds];
+    [ids[index - 1], ids[index]] = [ids[index], ids[index - 1]];
+    onUpdateSounds(ids);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === playlist.soundIds.length - 1) return;
+    const ids = [...playlist.soundIds];
+    [ids[index], ids[index + 1]] = [ids[index + 1], ids[index]];
+    onUpdateSounds(ids);
+  };
+
+  return (
+    <div className="rounded-xl border bg-card/80 border-border/50 transition-all duration-200 hover:border-border">
+      {/* Playlist header */}
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <ListMusic className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={handleKeyDown}
+            className="w-full text-sm font-medium bg-transparent border-none outline-none focus:ring-0 p-0 truncate"
+          />
+        </div>
+        <span className="text-xs text-muted-foreground shrink-0">
+          {playlist.soundIds.length} {playlist.soundIds.length === 1 ? "sound" : "sounds"}
+        </span>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+        >
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          onClick={onDelete}
+          className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground/40 hover:bg-destructive/10 hover:text-destructive transition-all"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Expanded: sound list + add */}
+      {expanded && (
+        <div className="px-4 pb-3 pt-0 border-t border-border/40">
+          {playlist.soundIds.length === 0 ? (
+            <p className="text-xs text-muted-foreground/60 py-3 text-center">
+              No sounds yet — add some below
+            </p>
+          ) : (
+            <ul className="py-2 space-y-1">
+              {playlist.soundIds.map((soundId, index) => {
+                const sound = sounds.find((s) => s.id === soundId);
+                if (!sound) return null;
+                return (
+                  <li key={soundId} className="flex items-center gap-2 text-sm py-1 group/item">
+                    <span className="text-xs text-muted-foreground/50 w-4 text-right tabular-nums">
+                      {index + 1}
+                    </span>
+                    <span className="flex-1 truncate">{sound.name}</span>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index === playlist.soundIds.length - 1}
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleRemoveSound(soundId)}
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground/50 hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {sounds.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full h-7 mt-1 px-2 text-xs text-left rounded-md border border-border/60 bg-background/80 text-muted-foreground hover:bg-muted/50 transition-colors flex items-center justify-between">
+                  <span>Add sounds...</span>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-60 overflow-y-auto">
+                {sounds.map((sound) => (
+                  <DropdownMenuCheckboxItem
+                    key={sound.id}
+                    checked={playlist.soundIds.includes(sound.id)}
+                    onCheckedChange={() => handleToggleSound(sound.id)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {sound.name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      )}
     </div>
   );
 }

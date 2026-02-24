@@ -101,6 +101,16 @@ const electronAPI = {
     scanSounds: () => ipcRenderer.invoke(IPC_CHANNELS.AUDIO_SCAN_SOUNDS),
   },
 
+  playlist: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.PLAYLIST_LIST),
+    create: (input: { id: string; name: string; soundIds: string[] }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLAYLIST_CREATE, input),
+    update: (input: { id: string; name?: string; soundIds?: string[] }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLAYLIST_UPDATE, input),
+    delete: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PLAYLIST_DELETE, id),
+  },
+
   app: {
     getPath: (name: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_GET_PATH, name),

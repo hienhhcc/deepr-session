@@ -15,6 +15,9 @@ import {
   FileAudio,
   Play,
   Pause,
+  SkipBack,
+  SkipForward,
+  ListMusic,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -49,10 +52,17 @@ const MARQUEE_CSS = `
 export function AmbientPlayer() {
   const sounds = useAudioStore((s) => s.sounds);
   const syncSounds = useAudioStore((s) => s.syncSounds);
+  const playlists = useAudioStore((s) => s.playlists);
+  const fetchPlaylists = useAudioStore((s) => s.fetchPlaylists);
+  const activePlaylistId = useAudioStore((s) => s.activePlaylistId);
+  const playPlaylist = useAudioStore((s) => s.playPlaylist);
+  const playNext = useAudioStore((s) => s.playNext);
+  const playPrev = useAudioStore((s) => s.playPrev);
 
   useEffect(() => {
     syncSounds();
-  }, [syncSounds]);
+    fetchPlaylists();
+  }, [syncSounds, fetchPlaylists]);
 
   // Inject marquee keyframes into <head> once
   useEffect(() => {
@@ -74,6 +84,7 @@ export function AmbientPlayer() {
   const setVolume = useAudioStore((s) => s.setVolume);
 
   const activeSound = sounds.find((s) => s.id === activeSoundId);
+  const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
 
   // Marquee: only scroll if the text overflows the container
   const marqueeContainerRef = useRef<HTMLDivElement>(null);
@@ -104,8 +115,13 @@ export function AmbientPlayer() {
     }
   };
 
-  const handleSoundChange = (id: string) => {
-    play(id);
+  const handleSoundChange = (value: string) => {
+    if (value.startsWith("playlist:")) {
+      const playlistId = value.replace("playlist:", "");
+      playPlaylist(playlistId);
+    } else {
+      play(value);
+    }
   };
 
   return (
@@ -135,7 +151,7 @@ export function AmbientPlayer() {
             Ambient Sound
           </span>
           {isEnabled && activeSound && (
-            <span className="text-[11px] text-primary/70 font-medium">
+            <span className="text-[11px] text-primary/70 font-medium truncate max-w-[120px]">
               {activeSound.name}
             </span>
           )}
@@ -146,9 +162,18 @@ export function AmbientPlayer() {
         />
       </div>
 
-      {/* Controls: play/pause + select + volume — shown when enabled */}
+      {/* Controls: prev + play/pause + next + select + volume — shown when enabled */}
       {isEnabled && (
-        <div className="px-4 pb-3.5 pt-0.5 flex items-center gap-3 animate-fade-in">
+        <div className="px-4 pb-3.5 pt-0.5 flex items-center gap-2 animate-fade-in">
+          {activePlaylist && (
+            <button
+              onClick={playPrev}
+              className="h-8 w-8 shrink-0 flex items-center justify-center rounded-full transition-colors bg-primary/10 hover:bg-primary/20 text-primary"
+            >
+              <SkipBack className="h-3.5 w-3.5" />
+            </button>
+          )}
+
           <button
             onClick={() => (isPaused ? resume() : pause())}
             className={cn(
@@ -163,7 +188,19 @@ export function AmbientPlayer() {
             )}
           </button>
 
-          <Select value={activeSoundId ?? ""} onValueChange={handleSoundChange}>
+          {activePlaylist && (
+            <button
+              onClick={playNext}
+              className="h-8 w-8 shrink-0 flex items-center justify-center rounded-full transition-colors bg-primary/10 hover:bg-primary/20 text-primary"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          <Select
+            value={activePlaylistId ? `playlist:${activePlaylistId}` : (activeSoundId ?? "")}
+            onValueChange={handleSoundChange}
+          >
             <SelectTrigger className="h-8 w-[160px] text-xs bg-background/80 [&>span]:!line-clamp-none [&>span]:!overflow-hidden">
               <div
                 ref={marqueeContainerRef}
@@ -175,10 +212,22 @@ export function AmbientPlayer() {
                   className="invisible absolute top-0 left-0 whitespace-nowrap"
                   aria-hidden
                 >
-                  {activeSound?.name ?? "Choose sound"}
+                  {activePlaylist ? activePlaylist.name : (activeSound?.name ?? "Choose sound")}
                 </span>
 
-                {activeSound ? (
+                {activePlaylist ? (
+                  needsMarquee && !isPaused ? (
+                    <div
+                      className="inline-flex whitespace-nowrap"
+                      style={{ width: "max-content", animation: "marquee-scroll 8s linear infinite" }}
+                    >
+                      <span>{activePlaylist.name}</span>
+                      <span className="ml-10">{activePlaylist.name}</span>
+                    </div>
+                  ) : (
+                    <span className="block truncate">{activePlaylist.name}</span>
+                  )
+                ) : activeSound ? (
                   needsMarquee && !isPaused ? (
                     <div
                       className="inline-flex whitespace-nowrap"
@@ -198,6 +247,25 @@ export function AmbientPlayer() {
               </div>
             </SelectTrigger>
             <SelectContent>
+              {playlists.length > 0 && (
+                <>
+                  <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                    Playlists
+                  </div>
+                  {playlists.map((pl) => (
+                    <SelectItem key={`playlist:${pl.id}`} value={`playlist:${pl.id}`}>
+                      <span className="flex items-center gap-2">
+                        <ListMusic className="h-3.5 w-3.5 text-muted-foreground" />
+                        {pl.name}
+                        <span className="text-[10px] text-muted-foreground/50">{pl.soundIds.length}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                  <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                    Sounds
+                  </div>
+                </>
+              )}
               {sounds.map((sound) => {
                 const Icon = iconMap[sound.icon];
                 return (

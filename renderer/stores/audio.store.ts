@@ -18,11 +18,20 @@ export interface SoundPreset {
   volume: number;
 }
 
+export interface Playlist {
+  id: string;
+  name: string;
+  soundIds: string[];
+}
+
 interface AudioState {
   // Persisted
   sounds: SoundConfig[];
+  activePlaylistId: string | null;
   // Runtime (not persisted)
+  playlists: Playlist[];
   activeSoundId: string | null;
+  currentTrackIndex: number;
   volume: number;
   isEnabled: boolean;
   isPaused: boolean;
@@ -41,6 +50,14 @@ interface AudioState {
   setVolume: (volume: number) => void;
   applyPreset: (preset: SoundPreset) => void;
   getPreset: () => SoundPreset | null;
+  // Playlist actions
+  fetchPlaylists: () => Promise<void>;
+  createPlaylist: (name: string, soundIds: string[]) => Promise<void>;
+  updatePlaylist: (id: string, data: { name?: string; soundIds?: string[] }) => Promise<void>;
+  removePlaylist: (id: string) => Promise<void>;
+  playPlaylist: (playlistId: string) => void;
+  playNext: () => void;
+  playPrev: () => void;
 }
 
 /** Convert a filename like "work-music-for-coding-flow.mp3" to "Work Music For Coding Flow" */
@@ -65,6 +82,9 @@ export const useAudioStore = create<AudioState>()(
   persist(
     (set, get) => ({
       sounds: [],
+      playlists: [],
+      activePlaylistId: null,
+      currentTrackIndex: 0,
       activeSoundId: null,
       volume: 0.2,
       isEnabled: false,
@@ -154,7 +174,7 @@ export const useAudioStore = create<AudioState>()(
 
         const howl = createHowl(sound.src, volume);
         if (howl) howl.play();
-        set({ activeSoundId: id, isEnabled: true, isPaused: false, howl });
+        set({ activeSoundId: id, isEnabled: true, isPaused: false, howl, activePlaylistId: null, currentTrackIndex: 0 });
       },
 
       pause: () => {
@@ -253,6 +273,115 @@ export const useAudioStore = create<AudioState>()(
         if (!isEnabled || !activeSoundId) return null;
         return { soundId: activeSoundId, volume };
       },
+
+      // --- Playlist actions ---
+
+      fetchPlaylists: async () => {
+        if (typeof window === "undefined") return;
+        const api = (window as any).electronAPI;
+        if (!api?.playlist?.list) return;
+        try {
+          const playlists: Playlist[] = await api.playlist.list();
+          set({ playlists });
+        } catch (err) {
+          console.error("[audio] Failed to fetch playlists:", err);
+        }
+      },
+
+      createPlaylist: async (name: string, soundIds: string[]) => {
+        const api = (window as any).electronAPI;
+        if (!api?.playlist?.create) return;
+        const id = crypto.randomUUID();
+        await api.playlist.create({ id, name, soundIds });
+        await get().fetchPlaylists();
+      },
+
+      updatePlaylist: async (id: string, data: { name?: string; soundIds?: string[] }) => {
+        const api = (window as any).electronAPI;
+        if (!api?.playlist?.update) return;
+        await api.playlist.update({ id, ...data });
+        await get().fetchPlaylists();
+      },
+
+      removePlaylist: async (id: string) => {
+        const api = (window as any).electronAPI;
+        if (!api?.playlist?.delete) return;
+        const { activePlaylistId } = get();
+        if (activePlaylistId === id) {
+          get().stop();
+          set({ activePlaylistId: null, currentTrackIndex: 0 });
+        }
+        await api.playlist.delete(id);
+        await get().fetchPlaylists();
+      },
+
+      playPlaylist: (playlistId: string) => {
+        const { playlists, sounds, volume, howl: currentHowl } = get();
+        const playlist = playlists.find((p) => p.id === playlistId);
+        if (!playlist || playlist.soundIds.length === 0) return;
+
+        const firstSoundId = playlist.soundIds[0];
+        const sound = sounds.find((s) => s.id === firstSoundId);
+        if (!sound) return;
+
+        if (currentHowl) {
+          currentHowl.stop();
+          currentHowl.unload();
+        }
+
+        const howl = createHowl(sound.src, volume);
+        if (howl) howl.play();
+        set({
+          activePlaylistId: playlistId,
+          currentTrackIndex: 0,
+          activeSoundId: firstSoundId,
+          isEnabled: true,
+          isPaused: false,
+          howl,
+        });
+      },
+
+      playNext: () => {
+        const { activePlaylistId, playlists, currentTrackIndex, sounds, volume, howl: currentHowl } = get();
+        if (!activePlaylistId) return;
+        const playlist = playlists.find((p) => p.id === activePlaylistId);
+        if (!playlist || playlist.soundIds.length === 0) return;
+
+        const nextIndex = (currentTrackIndex + 1) % playlist.soundIds.length;
+        const nextSoundId = playlist.soundIds[nextIndex];
+        const sound = sounds.find((s) => s.id === nextSoundId);
+        if (!sound) return;
+
+        if (currentHowl) {
+          currentHowl.stop();
+          currentHowl.unload();
+        }
+
+        const howl = createHowl(sound.src, volume);
+        if (howl) howl.play();
+        set({ currentTrackIndex: nextIndex, activeSoundId: nextSoundId, isPaused: false, howl });
+      },
+
+      playPrev: () => {
+        const { activePlaylistId, playlists, currentTrackIndex, sounds, volume, howl: currentHowl } = get();
+        if (!activePlaylistId) return;
+        const playlist = playlists.find((p) => p.id === activePlaylistId);
+        if (!playlist || playlist.soundIds.length === 0) return;
+
+        const prevIndex = (currentTrackIndex - 1 + playlist.soundIds.length) % playlist.soundIds.length;
+        const prevSoundId = playlist.soundIds[prevIndex];
+        const sound = sounds.find((s) => s.id === prevSoundId);
+        if (!sound) return;
+
+        if (currentHowl) {
+          currentHowl.stop();
+          currentHowl.unload();
+        }
+
+        const howl = createHowl(sound.src, volume);
+        if (howl) howl.play();
+        set({ currentTrackIndex: prevIndex, activeSoundId: prevSoundId, isPaused: false, howl });
+      },
     }),
     {
       name: "deepr-audio",
@@ -260,6 +389,7 @@ export const useAudioStore = create<AudioState>()(
         sounds: state.sounds,
         volume: state.volume,
         activeSoundId: state.activeSoundId,
+        activePlaylistId: state.activePlaylistId,
       }),
     },
   ),
