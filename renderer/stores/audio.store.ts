@@ -68,13 +68,14 @@ function filenameToName(filename: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function createHowl(src: string, volume: number): any {
+function createHowl(src: string, volume: number, loop: boolean = true, onend?: () => void): any {
   if (!Howl) return null;
   return new Howl({
     src: [src],
     volume,
-    loop: true,
+    loop,
     html5: true, // Stream audio — starts playing immediately instead of downloading entire file first
+    ...(onend ? { onend } : {}),
   });
 }
 
@@ -197,6 +198,8 @@ export const useAudioStore = create<AudioState>()(
         }
         set({
           activeSoundId: null,
+          activePlaylistId: null,
+          currentTrackIndex: 0,
           isEnabled: false,
           isPaused: false,
           howl: null,
@@ -204,8 +207,13 @@ export const useAudioStore = create<AudioState>()(
       },
 
       setEnabled: (enabled: boolean) => {
-        const { activeSoundId, sounds, volume, howl: currentHowl } = get();
+        const { activePlaylistId, activeSoundId, sounds, volume, howl: currentHowl } = get();
         if (enabled) {
+          // If there's a previously selected playlist, resume it
+          if (activePlaylistId) {
+            get().playPlaylist(activePlaylistId);
+            return;
+          }
           // If there's a previously selected sound, resume it
           if (activeSoundId) {
             const sound = sounds.find((s) => s.id === activeSoundId);
@@ -318,18 +326,25 @@ export const useAudioStore = create<AudioState>()(
       playPlaylist: (playlistId: string) => {
         const { playlists, sounds, volume, howl: currentHowl } = get();
         const playlist = playlists.find((p) => p.id === playlistId);
-        if (!playlist || playlist.soundIds.length === 0) return;
+        if (!playlist || playlist.soundIds.length === 0) {
+          // Clear stale playlist reference so UI doesn't get stuck
+          set({ activePlaylistId: null });
+          return;
+        }
 
         const firstSoundId = playlist.soundIds[0];
         const sound = sounds.find((s) => s.id === firstSoundId);
-        if (!sound) return;
+        if (!sound) {
+          set({ activePlaylistId: null });
+          return;
+        }
 
         if (currentHowl) {
           currentHowl.stop();
           currentHowl.unload();
         }
 
-        const howl = createHowl(sound.src, volume);
+        const howl = createHowl(sound.src, volume, false, () => get().playNext());
         if (howl) howl.play();
         set({
           activePlaylistId: playlistId,
@@ -357,7 +372,7 @@ export const useAudioStore = create<AudioState>()(
           currentHowl.unload();
         }
 
-        const howl = createHowl(sound.src, volume);
+        const howl = createHowl(sound.src, volume, false, () => get().playNext());
         if (howl) howl.play();
         set({ currentTrackIndex: nextIndex, activeSoundId: nextSoundId, isPaused: false, howl });
       },
@@ -378,7 +393,7 @@ export const useAudioStore = create<AudioState>()(
           currentHowl.unload();
         }
 
-        const howl = createHowl(sound.src, volume);
+        const howl = createHowl(sound.src, volume, false, () => get().playNext());
         if (howl) howl.play();
         set({ currentTrackIndex: prevIndex, activeSoundId: prevSoundId, isPaused: false, howl });
       },

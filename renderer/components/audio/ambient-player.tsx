@@ -105,7 +105,9 @@ export function AmbientPlayer() {
 
   const handleToggle = (checked: boolean) => {
     if (checked) {
-      if (activeSoundId) {
+      if (activePlaylistId) {
+        playPlaylist(activePlaylistId);
+      } else if (activeSoundId) {
         setEnabled(true);
       } else if (sounds.length > 0) {
         play(sounds[0].id);

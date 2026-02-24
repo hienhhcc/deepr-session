@@ -10,10 +10,9 @@ const execAsync = promisify(exec);
 export const DEFAULT_BLOCKED_DOMAINS = [
   "facebook.com", "www.facebook.com",
   "youtube.com", "www.youtube.com",
-  "discord.com", "www.discord.com",
 ];
 
-export const DEFAULT_BLOCKED_APPS = ["Discord"];
+export const DEFAULT_BLOCKED_APPS: string[] = [];
 
 const HOSTS_PATH = '/etc/hosts';
 const BLOCK_START_MARKER = '# DEEPR-SESSION-BLOCK-START';
