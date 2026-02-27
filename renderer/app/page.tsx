@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   TreePine,
   Target,
@@ -339,6 +339,7 @@ function SortableTaskCard({
             value={task.name}
             onSave={(name) => updateTask({ id: task.id, name })}
             className="flex-1 min-w-0 text-sm"
+            multiline
           />
         ) : (
           <button
@@ -467,17 +468,38 @@ function InlineEdit({
     }
   };
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (multiline) {
+      autoResize();
+    }
+  }, [draft, multiline, autoResize]);
+
   if (multiline) {
     return (
       <textarea
+        ref={textareaRef}
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          autoResize();
+        }}
         onBlur={commit}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={1}
+        style={{ resize: "none" }}
         className={cn(
-          "w-full bg-transparent border-none outline-none resize-none focus:ring-0 p-0 leading-relaxed",
+          "w-full bg-transparent border-none outline-none focus:ring-0 p-0 leading-relaxed overflow-hidden",
           !draft && "italic text-muted-foreground/40",
           className
         )}
@@ -529,21 +551,22 @@ function EditableSubtaskList({
       {subtasks.map((subtask) => (
         <div
           key={subtask.id}
-          className="group flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 transition-colors"
+          className="group flex items-start gap-2 py-1 px-1 rounded hover:bg-muted/50 transition-colors"
         >
           <input
             type="checkbox"
             checked={subtask.done}
             onChange={() => onToggle(subtask.id, !subtask.done)}
-            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer shrink-0"
+            className="h-3.5 w-3.5 mt-1 rounded border-border accent-primary cursor-pointer shrink-0"
           />
           <InlineEdit
             value={subtask.name}
             onSave={(name) => { if (name) onRename(subtask.id, name); }}
             className={cn(
-              "flex-1 text-sm",
+              "flex-1 min-w-0 text-sm",
               subtask.done && "line-through text-muted-foreground/60"
             )}
+            multiline
           />
           <button
             onClick={() => onDelete(subtask.id)}
@@ -572,8 +595,27 @@ function EditableSubtaskList({
 
 function TimerControls({ onStop }: { onStop: () => Promise<void> }) {
   const { status, pause, resume, skip, stop } = useTimer();
+  const wasAudioPlayingRef = useRef(false);
+
+  const handlePause = async () => {
+    const audioState = useAudioStore.getState();
+    wasAudioPlayingRef.current = audioState.isEnabled && !audioState.isPaused;
+    if (wasAudioPlayingRef.current) {
+      audioState.pause();
+    }
+    await pause();
+  };
+
+  const handleResume = async () => {
+    await resume();
+    if (wasAudioPlayingRef.current) {
+      useAudioStore.getState().resume();
+      wasAudioPlayingRef.current = false;
+    }
+  };
 
   const handleStop = async () => {
+    wasAudioPlayingRef.current = false;
     useAudioStore.getState().stop();
     await stop();
     await onStop();
@@ -585,7 +627,7 @@ function TimerControls({ onStop }: { onStop: () => Promise<void> }) {
     <div className="flex items-center justify-center gap-3 animate-fade-in-up">
       {status === "running" ? (
         <>
-          <Button variant="outline" size="lg" onClick={pause} className="gap-2 rounded-xl">
+          <Button variant="outline" size="lg" onClick={handlePause} className="gap-2 rounded-xl">
             <Pause className="h-5 w-5" />
             Pause
           </Button>
@@ -600,7 +642,7 @@ function TimerControls({ onStop }: { onStop: () => Promise<void> }) {
         </>
       ) : (
         <>
-          <Button variant="default" size="lg" onClick={resume} className="gap-2 rounded-xl">
+          <Button variant="default" size="lg" onClick={handleResume} className="gap-2 rounded-xl">
             <Play className="h-5 w-5" />
             Resume
           </Button>

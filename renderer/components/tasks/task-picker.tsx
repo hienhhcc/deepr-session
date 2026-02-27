@@ -115,20 +115,20 @@ export function TaskPicker({ selectedIds, onChange, defaultOpen, onOpenChange }:
       )}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg overflow-hidden">
           <DialogHeader>
             <DialogTitle>Select Tasks</DialogTitle>
           </DialogHeader>
 
           {showCreateForm ? (
-            <div>
+            <div className="min-w-0 overflow-hidden">
               <TaskForm
                 onSubmit={handleCreateAndSelect}
                 onCancel={() => setShowCreateForm(false)}
               />
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 min-w-0 overflow-hidden">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -139,7 +139,7 @@ export function TaskPicker({ selectedIds, onChange, defaultOpen, onOpenChange }:
                 />
               </div>
 
-              <div className="max-h-64 overflow-y-auto space-y-1">
+              <div className="max-h-64 overflow-y-auto overflow-x-hidden space-y-1">
                 {filteredTasks.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No tasks found
@@ -152,7 +152,7 @@ export function TaskPicker({ selectedIds, onChange, defaultOpen, onOpenChange }:
                         key={task.id}
                         type="button"
                         className={cn(
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors",
+                          "w-full min-w-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-colors",
                           isSelected
                             ? "bg-primary/10 text-primary"
                             : "hover:bg-muted/50"
@@ -179,16 +179,14 @@ export function TaskPicker({ selectedIds, onChange, defaultOpen, onOpenChange }:
                 )}
               </div>
 
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full gap-1.5 text-xs text-muted-foreground"
+                className="flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                 onClick={() => setShowCreateForm(true)}
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5 shrink-0" />
                 Create New Task
-              </Button>
+              </button>
 
               <div className="flex justify-end pt-1">
                 <Button size="sm" onClick={() => handleOpenChange(false)}>

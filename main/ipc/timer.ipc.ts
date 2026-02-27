@@ -36,11 +36,27 @@ export function registerTimerHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.TIMER_PAUSE, async () => {
     timerService.pause();
+
+    // Unblock distractors while paused
+    try {
+      await stopBlocking();
+    } catch (error) {
+      console.error("Failed to stop blocker on pause:", error);
+    }
+
     return timerService.getState();
   });
 
   ipcMain.handle(IPC_CHANNELS.TIMER_RESUME, async () => {
     timerService.resume();
+
+    // Re-block distractors on resume
+    try {
+      await startBlocking(DEFAULT_BLOCKED_DOMAINS, DEFAULT_BLOCKED_APPS);
+    } catch (error) {
+      console.error("Failed to start blocker on resume:", error);
+    }
+
     return timerService.getState();
   });
 

@@ -64,6 +64,17 @@ export function AmbientPlayer() {
     fetchPlaylists();
   }, [syncSounds, fetchPlaylists]);
 
+  // Once playlists are loaded, if activePlaylistId is set but nothing is playing
+  // (e.g. restored from a profile preset before playlists were fetched), start it.
+  useEffect(() => {
+    if (activePlaylistId && playlists.length > 0) {
+      const { howl } = useAudioStore.getState();
+      if (!howl) {
+        playPlaylist(activePlaylistId);
+      }
+    }
+  }, [playlists, activePlaylistId, playPlaylist]);
+
   // Inject marquee keyframes into <head> once
   useEffect(() => {
     if (document.getElementById(MARQUEE_STYLE_ID)) return;

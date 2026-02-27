@@ -16,6 +16,7 @@ export interface SoundConfig {
 export interface SoundPreset {
   soundId: string;
   volume: number;
+  activePlaylistId?: string | null;
 }
 
 export interface Playlist {
@@ -254,10 +255,29 @@ export const useAudioStore = create<AudioState>()(
           state.howl.unload();
         }
 
+        // If preset has a playlist, set state directly.
+        // We can't call playPlaylist() here because playlists may not be
+        // fetched yet (AmbientPlayer fetches them on mount, which happens after
+        // the profile form's useEffect calls applyPreset).
+        // Setting activePlaylistId in state is enough — the AmbientPlayer's
+        // handleToggle / UI will use it once playlists are loaded.
+        if (preset.activePlaylistId) {
+          set({
+            activePlaylistId: preset.activePlaylistId,
+            activeSoundId: preset.soundId,
+            volume: preset.volume,
+            isEnabled: false,
+            isPaused: false,
+            howl: null,
+          });
+          return;
+        }
+
         const sound = state.sounds.find((s) => s.id === preset.soundId);
         if (!sound) {
           set({
             activeSoundId: null,
+            activePlaylistId: null,
             isEnabled: false,
             howl: null,
             volume: preset.volume,
@@ -269,6 +289,7 @@ export const useAudioStore = create<AudioState>()(
         if (howl) howl.play();
         set({
           activeSoundId: preset.soundId,
+          activePlaylistId: null,
           isEnabled: true,
           isPaused: false,
           howl,
@@ -277,9 +298,9 @@ export const useAudioStore = create<AudioState>()(
       },
 
       getPreset: (): SoundPreset | null => {
-        const { activeSoundId, volume, isEnabled } = get();
+        const { activeSoundId, activePlaylistId, volume, isEnabled } = get();
         if (!isEnabled || !activeSoundId) return null;
-        return { soundId: activeSoundId, volume };
+        return { soundId: activeSoundId, volume, activePlaylistId };
       },
 
       // --- Playlist actions ---
