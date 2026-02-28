@@ -150,7 +150,7 @@ export const useAudioStore = create<AudioState>()(
             }
           }
 
-          // Keep non-default sounds that aren't from the /sounds folder (custom paths)
+          // Keep non-default sounds that aren't from the external sounds folder (custom paths)
           for (const sound of current) {
             if (!fileSrcs.has(sound.src) && !sound.isDefault) {
               merged.push(sound);
