@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, protocol, session } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { getDatabase, closeDatabase } from "./services/database.js";
 import { registerProfileHandlers } from "./ipc/profiles.ipc.js";
@@ -174,6 +175,7 @@ declare module "electron" {
   }
 }
 app.isQuitting = false;
+const EXTERNAL_SOUNDS_DIR = path.join(os.homedir(), "Music", "deepr-sounds");
 
 // Must be called before app is ready
 protocol.registerSchemesAsPrivileged([
@@ -207,6 +209,52 @@ app.whenReady().then(() => {
   session.defaultSession.protocol.handle('app', (request) => {
     let { pathname } = new URL(request.url);
     if (pathname === '/' || pathname === '') pathname = '/index.html';
+
+    // Serve audio files from the external sounds folder
+    if (pathname.startsWith('/sounds/')) {
+      const filename = path.basename(pathname);
+      const filePath = path.join(EXTERNAL_SOUNDS_DIR, filename);
+
+      try {
+        const contentType = MIME[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+        const stat = fs.statSync(filePath);
+        const totalSize = stat.size;
+
+        const rangeHeader = request.headers.get('range');
+        if (rangeHeader) {
+          const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+          if (match) {
+            const start = parseInt(match[1], 10);
+            const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+            const chunkSize = end - start + 1;
+            const buf = Buffer.alloc(chunkSize);
+            const fd = fs.openSync(filePath, 'r');
+            fs.readSync(fd, buf, 0, chunkSize, start);
+            fs.closeSync(fd);
+            return new Response(buf, {
+              status: 206,
+              headers: {
+                'content-type': contentType,
+                'content-range': `bytes ${start}-${end}/${totalSize}`,
+                'content-length': String(chunkSize),
+                'accept-ranges': 'bytes',
+              },
+            });
+          }
+        }
+
+        const content = fs.readFileSync(filePath);
+        return new Response(content, {
+          headers: {
+            'content-type': contentType,
+            'content-length': String(totalSize),
+            'accept-ranges': 'bytes',
+          },
+        });
+      } catch {
+        return new Response(null, { status: 404 });
+      }
+    }
 
     const candidates = [
       path.join(outDir, pathname),
