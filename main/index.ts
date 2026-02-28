@@ -316,6 +316,19 @@ app.whenReady().then(() => {
     });
   });
 
+  // In dev mode the page is served from http://localhost:3456, so relative
+  // /sounds/* paths resolve to the Next.js dev server (which has no audio files).
+  // Redirect those requests to app:///sounds/* so they hit the protocol handler.
+  if (isDev) {
+    session.defaultSession.webRequest.onBeforeRequest(
+      { urls: ['http://localhost:3456/sounds/*'] },
+      (details, callback) => {
+        const filename = path.basename(new URL(details.url).pathname);
+        callback({ redirectURL: `app:///sounds/${filename}` });
+      }
+    );
+  }
+
   // Set dock icon (dev mode — packaged builds use electron-builder icon)
   if (isDev && process.platform === 'darwin') {
     const devIconPath = path.join(__dirname, '../../app-icon/icon.icns');
