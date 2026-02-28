@@ -213,11 +213,11 @@ app.whenReady().then(() => {
     // Serve audio files from the external sounds folder
     if (pathname.startsWith('/sounds/')) {
       const filename = path.basename(pathname);
-      const filePath = path.join(EXTERNAL_SOUNDS_DIR, filename);
+      const audioFilePath = path.join(EXTERNAL_SOUNDS_DIR, filename);
 
       try {
-        const contentType = MIME[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
-        const stat = fs.statSync(filePath);
+        const contentType = MIME[path.extname(audioFilePath).toLowerCase()] ?? 'application/octet-stream';
+        const stat = fs.statSync(audioFilePath);
         const totalSize = stat.size;
 
         const rangeHeader = request.headers.get('range');
@@ -225,10 +225,16 @@ app.whenReady().then(() => {
           const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
           if (match) {
             const start = parseInt(match[1], 10);
-            const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+            const end = match[2] ? Math.min(parseInt(match[2], 10), totalSize - 1) : totalSize - 1;
+            if (start > end || start < 0) {
+              return new Response(null, {
+                status: 416,
+                headers: { 'content-range': `bytes */${totalSize}` },
+              });
+            }
             const chunkSize = end - start + 1;
             const buf = Buffer.alloc(chunkSize);
-            const fd = fs.openSync(filePath, 'r');
+            const fd = fs.openSync(audioFilePath, 'r');
             try {
               fs.readSync(fd, buf, 0, chunkSize, start);
             } finally {
@@ -246,7 +252,7 @@ app.whenReady().then(() => {
           }
         }
 
-        const content = fs.readFileSync(filePath);
+        const content = fs.readFileSync(audioFilePath);
         return new Response(content, {
           headers: {
             'content-type': contentType,
