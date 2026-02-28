@@ -1,6 +1,7 @@
-import { app, ipcMain } from "electron";
+import { ipcMain } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 import { IPC_CHANNELS } from "../../shared/types/ipc.js";
 import { getDatabase } from "../services/database.js";
 
@@ -8,10 +9,7 @@ const AUDIO_EXTENSIONS = new Set([".mp3", ".ogg", ".wav"]);
 
 export function registerAudioHandlers() {
   ipcMain.handle(IPC_CHANNELS.AUDIO_SCAN_SOUNDS, async () => {
-    const isDev = !app.isPackaged;
-    const soundsDir = isDev
-      ? path.join(app.getAppPath(), "renderer", "public", "sounds")
-      : path.join(app.getAppPath(), "renderer", "out", "sounds");
+    const soundsDir = path.join(os.homedir(), "Music", "deepr-sounds");
 
     try {
       const entries = fs.readdirSync(soundsDir, { withFileTypes: true });
