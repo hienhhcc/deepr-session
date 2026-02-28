@@ -229,8 +229,11 @@ app.whenReady().then(() => {
             const chunkSize = end - start + 1;
             const buf = Buffer.alloc(chunkSize);
             const fd = fs.openSync(filePath, 'r');
-            fs.readSync(fd, buf, 0, chunkSize, start);
-            fs.closeSync(fd);
+            try {
+              fs.readSync(fd, buf, 0, chunkSize, start);
+            } finally {
+              fs.closeSync(fd);
+            }
             return new Response(buf, {
               status: 206,
               headers: {
