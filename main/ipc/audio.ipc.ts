@@ -17,7 +17,7 @@ export function registerAudioHandlers() {
         .filter((e) => e.isFile() && AUDIO_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
         .map((e) => ({
           filename: e.name,
-          src: `app:///sounds/${e.name}`,
+          src: `app://./sounds/${e.name}`,
         }));
     } catch {
       return [];
