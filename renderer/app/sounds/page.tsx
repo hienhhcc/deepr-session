@@ -130,7 +130,7 @@ export default function SoundsPage() {
           <div>
             <h1 className="text-2xl font-semibold">Sound Library</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Sounds are auto-detected from the <code className="text-xs bg-muted/60 px-1.5 py-0.5 rounded">/sounds</code> folder
+              Sounds are auto-detected from the <code className="text-xs bg-muted/60 px-1.5 py-0.5 rounded">~/Music/deepr-sounds</code> folder
             </p>
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function SoundsPage() {
           </div>
           <p className="text-sm text-muted-foreground mb-1">No sounds found</p>
           <p className="text-xs text-muted-foreground/60 max-w-xs">
-            Place .mp3, .ogg, or .wav files in the <code className="bg-muted/60 px-1 rounded">renderer/public/sounds</code> folder and they'll appear here automatically.
+            Place .mp3, .ogg, or .wav files in the <code className="bg-muted/60 px-1 rounded">~/Music/deepr-sounds</code> folder and they'll appear here automatically.
           </p>
         </div>
       ) : (
